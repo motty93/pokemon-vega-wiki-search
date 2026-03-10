@@ -1,17 +1,17 @@
 {{template "base" .}}
 {{define "content"}}
-<div class="mb-4">
-  <a href="/" class="text-blue-600 hover:underline">&larr; 検索に戻る</a>
-</div>
+<nav class="mb-4" aria-label="パンくずリスト">
+  <a href="/" class="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded px-1">&larr; 検索に戻る</a>
+</nav>
 
-<div class="bg-white rounded-lg shadow p-6">
+<article class="bg-white rounded-lg shadow p-6">
   <!-- ヘッダー -->
   <div class="flex flex-col md:flex-row gap-6 mb-6">
     <div class="text-center md:text-left">
       {{if .Pokemon.ImageURL}}
-      <img src="{{.Pokemon.ImageURL}}" alt="{{.Pokemon.Name}}" class="w-48 h-48 mx-auto object-contain">
+      <img src="{{.Pokemon.ImageURL}}" alt="{{.Pokemon.Name}}の画像" class="w-48 h-48 mx-auto object-contain">
       {{else}}
-      <div class="w-48 h-48 mx-auto bg-gray-200 rounded-lg flex items-center justify-center">
+      <div class="w-48 h-48 mx-auto bg-gray-200 rounded-lg flex items-center justify-center" aria-hidden="true">
         <span class="text-gray-400 text-4xl">?</span>
       </div>
       {{end}}
@@ -25,7 +25,7 @@
         <span class="type-badge" style="background-color: {{typeColor .Pokemon.Type2}}">{{.Pokemon.Type2}}</span>
         {{end}}
       </div>
-      <table class="text-sm">
+      <table class="text-sm" aria-label="基本情報">
         {{if .Pokemon.Ability1}}<tr><td class="pr-4 text-gray-500">特性</td><td>{{.Pokemon.Ability1}}{{if .Pokemon.Ability2}} / {{.Pokemon.Ability2}}{{end}}</td></tr>{{end}}
         {{if .Pokemon.EggGroup1}}<tr><td class="pr-4 text-gray-500">タマゴグループ</td><td>{{.Pokemon.EggGroup1}}{{if .Pokemon.EggGroup2}} / {{.Pokemon.EggGroup2}}{{end}}</td></tr>{{end}}
         {{if .Pokemon.GenderRatio}}<tr><td class="pr-4 text-gray-500">性別比率</td><td>{{.Pokemon.GenderRatio}}</td></tr>{{end}}
@@ -41,13 +41,13 @@
   </div>
 
   <!-- 種族値 -->
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">種族値</h2>
-    <div class="space-y-2">
+  <section class="mb-6" aria-labelledby="stats-heading">
+    <h2 id="stats-heading" class="text-xl font-bold mb-3 border-b pb-2">種族値</h2>
+    <div class="space-y-2" role="list" aria-label="種族値一覧">
       {{range $pair := (statMap .Stats)}}
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-2" role="listitem">
         <span class="w-16 text-sm text-gray-600 text-right">{{index $pair 0}}</span>
-        <div class="flex-1 bg-gray-200 rounded-full h-4">
+        <div class="flex-1 bg-gray-200 rounded-full h-4" role="progressbar" aria-valuenow="{{index $pair 1}}" aria-valuemin="0" aria-valuemax="255" aria-label="{{index $pair 0}} {{index $pair 1}}">
           <div class="stat-bar bg-green-500" style="width: {{statPercent (index $pair 1)}}%"></div>
         </div>
         <span class="w-10 text-sm text-right font-mono">{{index $pair 1}}</span>
@@ -58,12 +58,12 @@
         <span class="font-bold">{{.Stats.Total}}</span>
       </div>
     </div>
-  </div>
+  </section>
 
   <!-- 努力値 -->
   {{if evHasAny .EVYield}}
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">努力値</h2>
+  <section class="mb-6" aria-labelledby="ev-heading">
+    <h2 id="ev-heading" class="text-xl font-bold mb-3 border-b pb-2">努力値</h2>
     <div class="flex gap-4 text-sm">
       {{if .EVYield.HP}}<span>HP +{{.EVYield.HP}}</span>{{end}}
       {{if .EVYield.Attack}}<span>攻撃 +{{.EVYield.Attack}}</span>{{end}}
@@ -72,107 +72,107 @@
       {{if .EVYield.SpDefense}}<span>特防 +{{.EVYield.SpDefense}}</span>{{end}}
       {{if .EVYield.Speed}}<span>素早さ +{{.EVYield.Speed}}</span>{{end}}
     </div>
-  </div>
+  </section>
   {{end}}
 
   <!-- 進化 -->
   {{if .Evolutions}}
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">進化</h2>
+  <section class="mb-6" aria-labelledby="evo-heading">
+    <h2 id="evo-heading" class="text-xl font-bold mb-3 border-b pb-2">進化</h2>
     <div class="space-y-2">
       {{range .Evolutions}}
       <div class="flex items-center gap-2 text-sm">
-        <a href="/pokemon/{{.FromID}}" class="text-blue-600 hover:underline">{{.FromName}}</a>
-        <span class="text-gray-400">→</span>
+        <a href="/pokemon/{{.FromID}}" class="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded px-1">{{.FromName}}</a>
+        <span class="text-gray-400" aria-hidden="true">→</span>
         {{if .Condition}}<span class="text-gray-500">({{.Condition}})</span>{{end}}
-        <span class="text-gray-400">→</span>
-        <a href="/pokemon/{{.ToID}}" class="text-blue-600 hover:underline">{{.ToName}}</a>
+        <span class="text-gray-400" aria-hidden="true">→</span>
+        <a href="/pokemon/{{.ToID}}" class="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded px-1">{{.ToName}}</a>
       </div>
       {{end}}
     </div>
-  </div>
+  </section>
   {{end}}
 
   <!-- 入手方法 -->
   {{if .Encounters}}
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">入手方法</h2>
-    <table class="w-full text-sm">
-      <thead><tr class="bg-gray-50"><th class="p-2 text-left">場所</th><th class="p-2 text-left">方法</th><th class="p-2 text-left">備考</th></tr></thead>
+  <section class="mb-6" aria-labelledby="encounter-heading">
+    <h2 id="encounter-heading" class="text-xl font-bold mb-3 border-b pb-2">入手方法</h2>
+    <table class="w-full text-sm" aria-label="入手方法一覧">
+      <thead><tr class="bg-gray-50"><th class="p-2 text-left" scope="col">場所</th><th class="p-2 text-left" scope="col">方法</th><th class="p-2 text-left" scope="col">備考</th></tr></thead>
       <tbody>
         {{range .Encounters}}
         <tr class="border-t"><td class="p-2">{{.Location}}</td><td class="p-2">{{.Method}}</td><td class="p-2">{{.Note}}</td></tr>
         {{end}}
       </tbody>
     </table>
-  </div>
+  </section>
   {{end}}
 
   <!-- レベルアップ技 -->
   {{if .LevelMoves}}
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">レベルアップ技</h2>
-    <table class="w-full text-sm">
-      <thead><tr class="bg-gray-50"><th class="p-2 text-left">Lv.</th><th class="p-2 text-left">技名</th></tr></thead>
+  <section class="mb-6" aria-labelledby="levelmove-heading">
+    <h2 id="levelmove-heading" class="text-xl font-bold mb-3 border-b pb-2">レベルアップ技</h2>
+    <table class="w-full text-sm" aria-label="レベルアップ技一覧">
+      <thead><tr class="bg-gray-50"><th class="p-2 text-left" scope="col">Lv.</th><th class="p-2 text-left" scope="col">技名</th></tr></thead>
       <tbody>
         {{range .LevelMoves}}
         <tr class="border-t"><td class="p-2">{{.Level}}</td><td class="p-2">{{.MoveName}}</td></tr>
         {{end}}
       </tbody>
     </table>
-  </div>
+  </section>
   {{end}}
 
   <!-- 技マシン -->
   {{if .TMMoves}}
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">技マシン</h2>
-    <table class="w-full text-sm">
-      <thead><tr class="bg-gray-50"><th class="p-2 text-left">No.</th><th class="p-2 text-left">技名</th></tr></thead>
+  <section class="mb-6" aria-labelledby="tm-heading">
+    <h2 id="tm-heading" class="text-xl font-bold mb-3 border-b pb-2">技マシン</h2>
+    <table class="w-full text-sm" aria-label="技マシン一覧">
+      <thead><tr class="bg-gray-50"><th class="p-2 text-left" scope="col">No.</th><th class="p-2 text-left" scope="col">技名</th></tr></thead>
       <tbody>
         {{range .TMMoves}}
         <tr class="border-t"><td class="p-2">{{.TMNumber}}</td><td class="p-2">{{.MoveName}}</td></tr>
         {{end}}
       </tbody>
     </table>
-  </div>
+  </section>
   {{end}}
 
   <!-- 教え技 -->
   {{if .TutorMoves}}
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">教え技</h2>
-    <div class="flex flex-wrap gap-2">
+  <section class="mb-6" aria-labelledby="tutor-heading">
+    <h2 id="tutor-heading" class="text-xl font-bold mb-3 border-b pb-2">教え技</h2>
+    <ul class="flex flex-wrap gap-2" aria-label="教え技一覧">
       {{range .TutorMoves}}
-      <span class="bg-gray-100 rounded px-3 py-1 text-sm">{{.MoveName}}</span>
+      <li class="bg-gray-100 rounded px-3 py-1 text-sm">{{.MoveName}}</li>
       {{end}}
-    </div>
-  </div>
+    </ul>
+  </section>
   {{end}}
 
   <!-- タマゴ技 -->
   {{if .EggMoves}}
-  <div class="mb-6">
-    <h2 class="text-xl font-bold mb-3 border-b pb-2">タマゴ技</h2>
-    <table class="w-full text-sm">
-      <thead><tr class="bg-gray-50"><th class="p-2 text-left">技名</th><th class="p-2 text-left">遺伝経路</th></tr></thead>
+  <section class="mb-6" aria-labelledby="egg-heading">
+    <h2 id="egg-heading" class="text-xl font-bold mb-3 border-b pb-2">タマゴ技</h2>
+    <table class="w-full text-sm" aria-label="タマゴ技一覧">
+      <thead><tr class="bg-gray-50"><th class="p-2 text-left" scope="col">技名</th><th class="p-2 text-left" scope="col">遺伝経路</th></tr></thead>
       <tbody>
         {{range .EggMoves}}
         <tr class="border-t"><td class="p-2">{{.MoveName}}</td><td class="p-2">{{.ParentChain}}</td></tr>
         {{end}}
       </tbody>
     </table>
-  </div>
+  </section>
   {{end}}
 
   <!-- ナビゲーション -->
-  <div class="flex justify-between mt-6 pt-4 border-t">
+  <nav class="flex justify-between mt-6 pt-4 border-t" aria-label="前後のポケモン">
     {{if gt .Pokemon.ID 1}}
-    <a href="/pokemon/{{add .Pokemon.ID -1}}" class="text-blue-600 hover:underline">&larr; No.{{printf "%03d" (add .Pokemon.ID -1)}}</a>
+    <a href="/pokemon/{{add .Pokemon.ID -1}}" class="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded px-1">&larr; No.{{printf "%03d" (add .Pokemon.ID -1)}}</a>
     {{else}}<span></span>{{end}}
     {{if lt .Pokemon.ID 386}}
-    <a href="/pokemon/{{add .Pokemon.ID 1}}" class="text-blue-600 hover:underline">No.{{printf "%03d" (add .Pokemon.ID 1)}} &rarr;</a>
+    <a href="/pokemon/{{add .Pokemon.ID 1}}" class="text-blue-600 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-400 rounded px-1">No.{{printf "%03d" (add .Pokemon.ID 1)}} &rarr;</a>
     {{else}}<span></span>{{end}}
-  </div>
-</div>
+  </nav>
+</article>
 {{end}}

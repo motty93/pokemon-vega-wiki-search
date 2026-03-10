@@ -4,25 +4,33 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ポケモンベガ（ファンメイドROM）の図鑑データを検索・閲覧できるWebサイト。386匹のポケモンの種族値、技、入手方法を掲載。">
+  <meta property="og:title" content="ポケモンベガ 図鑑検索">
+  <meta property="og:description" content="ポケモンベガの図鑑データを高速検索。種族値・技・入手方法を網羅。">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="ja_JP">
   <title>ポケモンベガ 図鑑検索</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
   <style>
-    .type-badge { @apply px-2 py-1 rounded text-white text-xs font-bold; }
+    .type-badge { @apply px-2 py-1 rounded text-white text-xs font-bold; min-width: 3rem; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
     .stat-bar { @apply h-4 rounded-full; transition: width 0.3s ease; }
+    .skip-link { position: absolute; top: -40px; left: 0; background: #000; color: #fff; padding: 8px 16px; z-index: 100; transition: top 0.2s; }
+    .skip-link:focus { top: 0; }
   </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
-  <header class="bg-red-600 text-white shadow-lg">
+  <a href="#main-content" class="skip-link">メインコンテンツへスキップ</a>
+  <header class="bg-red-600 text-white shadow-lg" role="banner">
     <div class="container mx-auto px-4 py-4">
       <a href="/" class="text-2xl font-bold hover:text-red-200">ポケモンベガ 図鑑検索</a>
     </div>
   </header>
-  <main class="container mx-auto px-4 py-6">
+  <main id="main-content" class="container mx-auto px-4 py-6" role="main">
     {{template "content" .}}
   </main>
-  <footer class="bg-gray-800 text-gray-400 text-center py-4 mt-8">
+  <footer class="bg-gray-800 text-gray-400 text-center py-4 mt-8" role="contentinfo">
     <p>ポケモンベガ Wiki Data &copy; 2024</p>
   </footer>
 </body>

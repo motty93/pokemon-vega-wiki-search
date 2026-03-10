@@ -1,13 +1,13 @@
 {{define "search_results"}}
 {{if .Results}}
-<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4" role="list" aria-label="検索結果">
   {{range .Results}}
-  <a href="/pokemon/{{.Pokemon.ID}}" class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4 block">
+  <a href="/pokemon/{{.Pokemon.ID}}" class="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4 block focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-offset-2" role="listitem">
     <div class="text-center">
       {{if .Pokemon.ImageURL}}
-      <img src="{{.Pokemon.ImageURL}}" alt="{{.Pokemon.Name}}" class="w-24 h-24 mx-auto object-contain mb-2">
+      <img src="{{.Pokemon.ImageURL}}" alt="{{.Pokemon.Name}}の画像" class="w-24 h-24 mx-auto object-contain mb-2" loading="lazy">
       {{else}}
-      <div class="w-24 h-24 mx-auto bg-gray-200 rounded-full flex items-center justify-center mb-2">
+      <div class="w-24 h-24 mx-auto bg-gray-200 rounded-full flex items-center justify-center mb-2" aria-hidden="true">
         <span class="text-gray-400 text-2xl">?</span>
       </div>
       {{end}}
@@ -25,7 +25,7 @@
   {{end}}
 </div>
 {{else}}
-<div class="text-center py-8 text-gray-500">
+<div class="text-center py-8 text-gray-500" role="status">
   {{if .Query}}
   「{{.Query}}」に一致するポケモンが見つかりませんでした。
   {{else}}
