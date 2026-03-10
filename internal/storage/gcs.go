@@ -1,0 +1,86 @@
+package storage
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"io"
+	"log"
+	"net/http"
+	"os"
+	"path/filepath"
+
+	"cloud.google.com/go/storage"
+	mydb "github.com/motty93/pokemon-vega-wiki-crawler/internal/db"
+)
+
+// UploadPokemonImages はDBに保存されたWiki画像URLをGCSにアップロードし、URLを更新する
+func UploadPokemonImages(d *sql.DB) error {
+	bucketName := os.Getenv("GCS_BUCKET_NAME")
+	if bucketName == "" {
+		return fmt.Errorf("GCS_BUCKET_NAME is not set")
+	}
+
+	ctx := context.Background()
+	client, err := storage.NewClient(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to create GCS client: %w", err)
+	}
+	defer client.Close()
+
+	rows, err := d.Query("SELECT id, image_url FROM pokemon WHERE image_url IS NOT NULL AND image_url != '' AND image_url LIKE 'http%'")
+	if err != nil {
+		return err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id int
+		var imageURL string
+		if err := rows.Scan(&id, &imageURL); err != nil {
+			continue
+		}
+
+		gcsURL, err := uploadImage(ctx, client, bucketName, id, imageURL)
+		if err != nil {
+			log.Printf("WARNING: failed to upload image for pokemon %d: %v", id, err)
+			continue
+		}
+
+		if err := mydb.UpdateImageURL(d, id, gcsURL); err != nil {
+			log.Printf("WARNING: failed to update image URL for pokemon %d: %v", id, err)
+		}
+	}
+
+	return nil
+}
+
+func uploadImage(ctx context.Context, client *storage.Client, bucket string, pokemonID int, srcURL string) (string, error) {
+	resp, err := http.Get(srcURL)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	ext := filepath.Ext(srcURL)
+	if ext == "" {
+		ext = ".png"
+	}
+	objectName := fmt.Sprintf("pokemon/%03d%s", pokemonID, ext)
+
+	writer := client.Bucket(bucket).Object(objectName).NewWriter(ctx)
+	writer.ContentType = resp.Header.Get("Content-Type")
+	if writer.ContentType == "" {
+		writer.ContentType = "image/png"
+	}
+
+	if _, err := io.Copy(writer, resp.Body); err != nil {
+		writer.Close()
+		return "", err
+	}
+	if err := writer.Close(); err != nil {
+		return "", err
+	}
+
+	return fmt.Sprintf("https://storage.googleapis.com/%s/%s", bucket, objectName), nil
+}

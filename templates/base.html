@@ -1,0 +1,30 @@
+{{define "base"}}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ポケモンベガ 図鑑検索</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <style>
+    .type-badge { @apply px-2 py-1 rounded text-white text-xs font-bold; }
+    .stat-bar { @apply h-4 rounded-full; transition: width 0.3s ease; }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+  <header class="bg-red-600 text-white shadow-lg">
+    <div class="container mx-auto px-4 py-4">
+      <a href="/" class="text-2xl font-bold hover:text-red-200">ポケモンベガ 図鑑検索</a>
+    </div>
+  </header>
+  <main class="container mx-auto px-4 py-6">
+    {{template "content" .}}
+  </main>
+  <footer class="bg-gray-800 text-gray-400 text-center py-4 mt-8">
+    <p>ポケモンベガ Wiki Data &copy; 2024</p>
+  </footer>
+</body>
+</html>
+{{end}}

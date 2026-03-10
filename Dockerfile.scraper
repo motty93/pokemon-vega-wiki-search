@@ -1,0 +1,12 @@
+FROM golang:1.23 AS builder
+WORKDIR /app
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 go build -o scraper ./cmd/scraper
+
+FROM scratch
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /app/scraper /scraper
+COPY --from=builder /app/migrations /migrations
+ENTRYPOINT ["/scraper"]

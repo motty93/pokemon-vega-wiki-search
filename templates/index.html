@@ -1,0 +1,54 @@
+{{template "base" .}}
+{{define "content"}}
+<div x-data="{ showAdvanced: false }">
+  <div class="bg-white rounded-lg shadow p-6 mb-6">
+    <h2 class="text-xl font-bold mb-4">ポケモン検索</h2>
+    <form hx-get="/search" hx-target="#results" hx-trigger="submit" hx-indicator="#loading">
+      <div class="flex gap-4 mb-4">
+        <input type="text" name="q" placeholder="ポケモン名で検索..."
+          class="flex-1 border rounded-lg px-4 py-2 focus:outline-none focus:ring-2 focus:ring-red-400"
+          hx-get="/search" hx-trigger="keyup changed delay:300ms" hx-target="#results">
+        <select name="type" class="border rounded-lg px-4 py-2"
+          hx-get="/search" hx-trigger="change" hx-target="#results" hx-include="[name='q']">
+          <option value="">全タイプ</option>
+          {{range .Types}}
+          <option value="{{.}}">{{.}}</option>
+          {{end}}
+        </select>
+      </div>
+
+      <button type="button" @click="showAdvanced = !showAdvanced"
+        class="text-sm text-blue-600 hover:underline mb-4">
+        種族値フィルター <span x-text="showAdvanced ? '▲' : '▼'"></span>
+      </button>
+
+      <div x-show="showAdvanced" x-transition class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-4">
+        {{range $stat := (slice "hp" "attack" "defense" "sp_atk" "sp_def" "speed")}}
+        <div>
+          <label class="block text-sm font-medium text-gray-600 capitalize">{{$stat}}</label>
+          <div class="flex gap-2">
+            <input type="number" name="{{$stat}}_min" placeholder="min" min="0" max="255"
+              class="w-20 border rounded px-2 py-1 text-sm">
+            <span class="self-center">-</span>
+            <input type="number" name="{{$stat}}_max" placeholder="max" min="0" max="255"
+              class="w-20 border rounded px-2 py-1 text-sm">
+          </div>
+        </div>
+        {{end}}
+      </div>
+
+      <button type="submit" class="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700">
+        検索
+      </button>
+    </form>
+  </div>
+
+  <div id="loading" class="htmx-indicator text-center py-4">
+    <span class="text-gray-500">検索中...</span>
+  </div>
+
+  <div id="results">
+    <!-- htmxで検索結果が挿入される -->
+  </div>
+</div>
+{{end}}
