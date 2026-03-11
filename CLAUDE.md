@@ -19,20 +19,26 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## ビルド・実行コマンド
 
-```bash
-# ビルド
-CGO_ENABLED=0 go build -o server ./cmd/server
-CGO_ENABLED=0 go build -o scraper ./cmd/scraper
+ローカル実行は `.env` を自動読み込みするMakefile経由で行う。
 
-# 実行
-go run ./cmd/server
-go run ./cmd/scraper
+```bash
+# ローカル実行（.envから環境変数を読み込み）
+make server          # Webサーバー起動
+make scraper         # スクレイパー実行
+
+# ビルド
+make build           # server + scraper 両方
+make build-server    # サーバーのみ
+make build-scraper   # スクレイパーのみ
 
 # テスト
-go test ./...
-go test ./internal/scraper/  # 単一パッケージのみ
-go test -run TestFunctionName ./internal/scraper/  # 単一テストのみ
+make test
+
+# クリーン
+make clean
 ```
+
+本番環境ではシェル環境変数を直接設定する。`go run` を直接使う場合は事前に環境変数のexportが必要。
 
 ## アーキテクチャ
 
@@ -72,6 +78,14 @@ TURSO_AUTH_TOKEN=
 GCS_BUCKET_NAME=
 GOOGLE_APPLICATION_CREDENTIALS=
 ```
+
+## 実装ログ
+
+実装・修正を行った際は `docs/implementation_logs/YYYYMMDD/` 配下にログを残すこと。
+
+- ディレクトリ: `docs/implementation_logs/YYYYMMDD/`（実施日ベース）
+- ファイル名: `01_<やったこと>.md`, `02_<やったこと>.md`, ...（連番 + 内容の要約）
+- 内容: 背景、変更内容（対象ファイルと何をしたか）、関連情報
 
 ## 注意事項
 

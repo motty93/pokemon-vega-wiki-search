@@ -100,9 +100,16 @@ func InsertLearnsetEgg(db *sql.DB, pokemonID, moveID int, parentChain string) er
 // InsertEncounter は入手方法を挿入する
 func InsertEncounter(db *sql.DB, pokemonID int, location, method, note string) error {
 	_, err := db.Exec(`
-		INSERT INTO encounter (pokemon_id, location, method, note)
+		INSERT OR IGNORE INTO encounter (pokemon_id, location, method, note)
 		VALUES (?, ?, ?, ?)`, pokemonID, location, method, note)
 	return err
+}
+
+// GetPokemonIDByName は名前からポケモンIDを取得する
+func GetPokemonIDByName(db *sql.DB, name string) (int, error) {
+	var id int
+	err := db.QueryRow("SELECT id FROM pokemon WHERE name = ?", name).Scan(&id)
+	return id, err
 }
 
 // UpdateImageURL は画像URLを更新する

@@ -46,7 +46,8 @@ CREATE TABLE IF NOT EXISTS evolution (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
   from_pokemon_id INTEGER REFERENCES pokemon(id),
   to_pokemon_id   INTEGER REFERENCES pokemon(id),
-  condition       TEXT
+  condition       TEXT,
+  UNIQUE(from_pokemon_id, to_pokemon_id)
 );
 
 -- 技マスタ
@@ -92,7 +93,8 @@ CREATE TABLE IF NOT EXISTS encounter (
   pokemon_id  INTEGER REFERENCES pokemon(id),
   location    TEXT,
   method      TEXT,
-  note        TEXT
+  note        TEXT,
+  UNIQUE(pokemon_id, location, method)
 );
 
 -- FTS5による名前検索

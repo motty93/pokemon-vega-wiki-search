@@ -1,5 +1,19 @@
 package model
 
+import (
+	"fmt"
+	"strings"
+)
+
+// 有効なポケモンタイプ一覧
+var validTypes = map[string]bool{
+	"ノーマル": true, "ほのお": true, "みず": true, "でんき": true,
+	"くさ": true, "こおり": true, "かくとう": true, "どく": true,
+	"じめん": true, "ひこう": true, "エスパー": true, "むし": true,
+	"いわ": true, "ゴースト": true, "ドラゴン": true, "あく": true,
+	"はがね": true,
+}
+
 // Pokemon はポケモンの基本情報
 type Pokemon struct {
 	ID             int    `json:"id"`
@@ -118,6 +132,49 @@ type EvolutionDetail struct {
 	FromID    int    `json:"from_id"`
 	ToID      int    `json:"to_id"`
 	Condition string `json:"condition"`
+}
+
+// Validate はパース結果を検証し、問題があればエラーを返す
+func (d *PokemonDetail) Validate() error {
+	var errors []string
+
+	// Pokemon基本情報
+	if d.Pokemon.ID < 1 || d.Pokemon.ID > 386 {
+		errors = append(errors, fmt.Sprintf("invalid ID: %d", d.Pokemon.ID))
+	}
+	if d.Pokemon.Name == "" {
+		errors = append(errors, "name is empty")
+	}
+	if d.Pokemon.Type1 == "" {
+		errors = append(errors, "type1 is empty")
+	} else if !validTypes[d.Pokemon.Type1] {
+		errors = append(errors, fmt.Sprintf("invalid type1: %q", d.Pokemon.Type1))
+	}
+	if d.Pokemon.Type2 != "" && !validTypes[d.Pokemon.Type2] {
+		errors = append(errors, fmt.Sprintf("invalid type2: %q", d.Pokemon.Type2))
+	}
+	if d.Pokemon.Ability1 == "" {
+		errors = append(errors, "ability1 is empty")
+	}
+
+	// 種族値（全て1以上であるべき）
+	if d.Stats.HP == 0 && d.Stats.Attack == 0 && d.Stats.Defense == 0 &&
+		d.Stats.SpAttack == 0 && d.Stats.SpDefense == 0 && d.Stats.Speed == 0 {
+		errors = append(errors, "all base stats are 0")
+	}
+
+	// 画像URL
+	if d.Pokemon.ImageURL == "" {
+		errors = append(errors, "image_url is empty")
+	} else if !strings.HasPrefix(d.Pokemon.ImageURL, "https://") {
+		errors = append(errors, fmt.Sprintf("invalid image_url: %q", d.Pokemon.ImageURL))
+	}
+
+	if len(errors) > 0 {
+		return fmt.Errorf("validation failed for No.%03d %s: %s",
+			d.Pokemon.ID, d.Pokemon.Name, strings.Join(errors, "; "))
+	}
+	return nil
 }
 
 // SearchResult は検索結果

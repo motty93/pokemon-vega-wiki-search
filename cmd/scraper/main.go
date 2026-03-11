@@ -26,7 +26,7 @@ func main() {
 	}
 	log.Println("Scraping completed successfully")
 
-	// GCS画像アップロード（環境変数が設定されている場合のみ）
+	// 画像保存: GCSが設定されていればGCSへ、なければローカルにダウンロード
 	if os.Getenv("GCS_BUCKET_NAME") != "" {
 		log.Println("Uploading images to GCS...")
 		if err := storage.UploadPokemonImages(db); err != nil {
@@ -34,6 +34,10 @@ func main() {
 		}
 		log.Println("Image upload completed")
 	} else {
-		log.Println("GCS_BUCKET_NAME not set, skipping image upload")
+		log.Println("GCS_BUCKET_NAME not set, downloading images locally...")
+		if err := storage.DownloadPokemonImages(db, "static/images/pokemon"); err != nil {
+			log.Fatalf("Image download failed: %v", err)
+		}
+		log.Println("Image download completed")
 	}
 }

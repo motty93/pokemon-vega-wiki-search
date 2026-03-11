@@ -42,16 +42,58 @@ func Migrate(db *sql.DB) error {
 		return fmt.Errorf("failed to read migration file: %w", err)
 	}
 
-	statements := strings.Split(string(data), ";")
+	statements := splitSQL(string(data))
 	for _, stmt := range statements {
-		stmt = strings.TrimSpace(stmt)
-		if stmt == "" {
-			continue
-		}
 		if _, err := db.Exec(stmt); err != nil {
 			return fmt.Errorf("failed to execute migration: %s: %w", stmt[:min(len(stmt), 80)], err)
 		}
 	}
 
 	return nil
+}
+
+// splitSQL はSQLをステートメント単位に分割する（BEGIN...END内のセミコロンを考慮）
+func splitSQL(sql string) []string {
+	var statements []string
+	var current strings.Builder
+	inBlock := false
+
+	for _, line := range strings.Split(sql, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "--") {
+			continue
+		}
+
+		upperLine := strings.ToUpper(trimmed)
+
+		if strings.Contains(upperLine, "BEGIN") {
+			inBlock = true
+		}
+
+		current.WriteString(line)
+		current.WriteString("\n")
+
+		if inBlock && strings.HasSuffix(upperLine, "END;") {
+			inBlock = false
+			statements = append(statements, strings.TrimSpace(current.String()))
+			current.Reset()
+		} else if !inBlock && strings.HasSuffix(trimmed, ";") {
+			stmt := strings.TrimSpace(current.String())
+			stmt = strings.TrimSuffix(stmt, ";")
+			stmt = strings.TrimSpace(stmt)
+			if stmt != "" {
+				statements = append(statements, stmt)
+			}
+			current.Reset()
+		}
+	}
+
+	if remaining := strings.TrimSpace(current.String()); remaining != "" {
+		remaining = strings.TrimSuffix(remaining, ";")
+		if remaining = strings.TrimSpace(remaining); remaining != "" {
+			statements = append(statements, remaining)
+		}
+	}
+
+	return statements
 }
