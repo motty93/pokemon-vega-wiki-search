@@ -256,13 +256,40 @@ func SearchPokemon(d *sql.DB, params model.SearchParams) ([]model.SearchResult, 
 	var conditions []string
 	var args []interface{}
 
-	// 名前検索（FTS5）
+	// 名前検索 + ローマ字変換 + タイププレフィックスマッチ（OR結合）
 	if params.Query != "" {
-		conditions = append(conditions, "p.id IN (SELECT rowid FROM pokemon_fts WHERE pokemon_fts MATCH ?)")
+		var orConds []string
+		// FTS5で名前の前方一致検索（元のクエリ）
+		orConds = append(orConds, "p.id IN (SELECT rowid FROM pokemon_fts WHERE pokemon_fts MATCH ?)")
 		args = append(args, params.Query+"*")
+		// ローマ字→カタカナ変換でもFTS検索
+		if params.RomajiQuery != "" {
+			orConds = append(orConds, "p.id IN (SELECT rowid FROM pokemon_fts WHERE pokemon_fts MATCH ?)")
+			args = append(args, params.RomajiQuery+"*")
+		}
+		// ひらがな→カタカナ変換でもFTS検索
+		if params.KatakanaQuery != "" {
+			orConds = append(orConds, "p.id IN (SELECT rowid FROM pokemon_fts WHERE pokemon_fts MATCH ?)")
+			args = append(args, params.KatakanaQuery+"*")
+		}
+		// プレフィックスマッチしたタイプで絞り込み
+		if len(params.MatchedTypes) > 0 {
+			placeholders := make([]string, len(params.MatchedTypes))
+			for i, t := range params.MatchedTypes {
+				placeholders[i] = "?"
+				args = append(args, t)
+			}
+			inClause := strings.Join(placeholders, ",")
+			orConds = append(orConds, fmt.Sprintf("(p.type1 IN (%s) OR p.type2 IN (%s))", inClause, inClause))
+			// IN句を2回使うのでargsも2回追加
+			for _, t := range params.MatchedTypes {
+				args = append(args, t)
+			}
+		}
+		conditions = append(conditions, "("+strings.Join(orConds, " OR ")+")")
 	}
 
-	// タイプフィルター
+	// タイプフィルター（明示的にタイプ指定された場合）
 	if params.Type != "" {
 		conditions = append(conditions, "(p.type1 = ? OR p.type2 = ?)")
 		args = append(args, params.Type, params.Type)
@@ -303,7 +330,22 @@ func SearchPokemon(d *sql.DB, params model.SearchParams) ([]model.SearchResult, 
 	if len(conditions) > 0 {
 		query += " WHERE " + strings.Join(conditions, " AND ")
 	}
-	query += " ORDER BY p.id"
+
+	// タイプマッチがある場合、マッチしたタイプごとにグループ化して優先表示
+	if len(params.MatchedTypes) > 0 {
+		// 各マッチタイプに順番を振る CASE式
+		// 例: どく→0, ドラゴン→1, 非マッチ→2
+		var caseParts []string
+		for i, t := range params.MatchedTypes {
+			caseParts = append(caseParts, fmt.Sprintf("WHEN p.type1 = ? OR p.type2 = ? THEN %d", i))
+			args = append(args, t, t)
+		}
+		elseVal := len(params.MatchedTypes)
+		caseExpr := fmt.Sprintf("CASE %s ELSE %d END", strings.Join(caseParts, " "), elseVal)
+		query += fmt.Sprintf(" ORDER BY %s, p.id", caseExpr)
+	} else {
+		query += " ORDER BY p.id"
+	}
 
 	rows, err := d.Query(query, args...)
 	if err != nil {

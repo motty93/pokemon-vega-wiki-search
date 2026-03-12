@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	mydb "github.com/motty93/pokemon-vega-wiki-crawler/internal/db"
@@ -20,6 +21,72 @@ var typeColors = map[string]string{
 	"じめん": "#E0C068", "ひこう": "#A890F0", "エスパー": "#F85888", "むし": "#A8B820",
 	"いわ": "#B8A038", "ゴースト": "#705898", "ドラゴン": "#7038F8", "あく": "#705848",
 	"はがね": "#B8B8D0", "フェアリー": "#EE99AC",
+}
+
+// typeEntry はタイプの正式名と検索用の全表記を保持する
+type typeEntry struct {
+	Name    string   // DB上の正式名（例: "どく", "ドラゴン"）
+	Aliases []string // 検索用の全表記（ひらがな/カタカナ/ローマ字/漢字/英語）
+}
+
+var typeEntries = []typeEntry{
+	{"ノーマル", []string{"のーまる", "ノーマル", "normal", "no-maru"}},
+	{"ほのお", []string{"ほのお", "ホノオ", "honoo", "fire", "炎", "火"}},
+	{"みず", []string{"みず", "ミズ", "mizu", "water", "水"}},
+	{"でんき", []string{"でんき", "デンキ", "denki", "electric", "電気", "電", "雷"}},
+	{"くさ", []string{"くさ", "クサ", "kusa", "grass", "草"}},
+	{"こおり", []string{"こおり", "コオリ", "koori", "ice", "氷"}},
+	{"かくとう", []string{"かくとう", "カクトウ", "kakutou", "fighting", "格闘"}},
+	{"どく", []string{"どく", "ドク", "doku", "poison", "毒"}},
+	{"じめん", []string{"じめん", "ジメン", "jimen", "ground", "地面"}},
+	{"ひこう", []string{"ひこう", "ヒコウ", "hikou", "flying", "飛行"}},
+	{"エスパー", []string{"えすぱー", "エスパー", "esupaa", "esper", "psychic", "超", "超能力"}},
+	{"むし", []string{"むし", "ムシ", "mushi", "bug", "虫"}},
+	{"いわ", []string{"いわ", "イワ", "iwa", "rock", "岩"}},
+	{"ゴースト", []string{"ごーすと", "ゴースト", "goosuto", "ghost", "霊", "幽霊"}},
+	{"ドラゴン", []string{"どらごん", "ドラゴン", "doragon", "dragon", "竜", "龍"}},
+	{"あく", []string{"あく", "アク", "aku", "dark", "悪"}},
+	{"はがね", []string{"はがね", "ハガネ", "hagane", "steel", "鋼"}},
+	{"フェアリー", []string{"ふぇありー", "フェアリー", "fearii", "fairy", "妖精"}},
+}
+
+// matchTypesByPrefix はクエリ文字列に前方一致するタイプ名を返す
+func matchTypesByPrefix(q string) []string {
+	if q == "" {
+		return nil
+	}
+	lower := strings.ToLower(q)
+	seen := make(map[string]bool)
+	var matched []string
+	for _, entry := range typeEntries {
+		for _, alias := range entry.Aliases {
+			if strings.HasPrefix(strings.ToLower(alias), lower) {
+				if !seen[entry.Name] {
+					seen[entry.Name] = true
+					matched = append(matched, entry.Name)
+				}
+				break
+			}
+		}
+	}
+	return matched
+}
+
+// normalizeType はタイプ入力を正式名に変換する（完全一致）
+func normalizeType(q string) string {
+	q = strings.TrimSpace(q)
+	if q == "" {
+		return q
+	}
+	lower := strings.ToLower(q)
+	for _, entry := range typeEntries {
+		for _, alias := range entry.Aliases {
+			if strings.ToLower(alias) == lower {
+				return entry.Name
+			}
+		}
+	}
+	return q
 }
 
 // Handler はHTTPハンドラー
@@ -209,9 +276,13 @@ func (h *Handler) PokemonDetail(w http.ResponseWriter, r *http.Request) {
 
 // Search はhtmx部分レスポンスで検索結果を返す
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
+	rawQuery := strings.TrimSpace(r.URL.Query().Get("q"))
 	params := model.SearchParams{
-		Query: r.URL.Query().Get("q"),
-		Type:  r.URL.Query().Get("type"),
+		Query:         rawQuery,
+		RomajiQuery:   romajiToKatakana(rawQuery),
+		KatakanaQuery: hiraganaToKatakana(rawQuery),
+		Type:          normalizeType(r.URL.Query().Get("type")),
+		MatchedTypes:  matchTypesByPrefix(rawQuery),
 	}
 
 	params.HPMin, _ = strconv.Atoi(r.URL.Query().Get("hp_min"))

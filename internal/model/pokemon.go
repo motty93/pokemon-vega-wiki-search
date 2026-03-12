@@ -185,8 +185,11 @@ type SearchResult struct {
 
 // SearchParams は検索パラメータ
 type SearchParams struct {
-	Query      string
-	Type       string
+	Query         string
+	RomajiQuery   string   // ローマ字→カタカナ変換されたクエリ（空なら変換なし）
+	KatakanaQuery string   // ひらがな→カタカナ変換されたクエリ（空なら変換なし）
+	Type          string
+	MatchedTypes []string // クエリからプレフィックスマッチしたタイプ名
 	HPMin      int
 	HPMax      int
 	AttackMin  int
