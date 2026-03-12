@@ -29,6 +29,8 @@ func main() {
 	mux.HandleFunc("GET /", h.Index)
 	mux.HandleFunc("GET /pokemon/{id}", h.PokemonDetail)
 	mux.HandleFunc("GET /search", h.Search)
+	mux.HandleFunc("GET /sitemap.xml", h.Sitemap)
+	mux.HandleFunc("GET /robots.txt", h.RobotsTxt)
 	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	port := os.Getenv("PORT")
@@ -37,7 +39,7 @@ func main() {
 	}
 
 	log.Printf("Server starting on :%s", port)
-	if err := http.ListenAndServe(":"+port, mux); err != nil {
+	if err := http.ListenAndServe(":"+port, handler.LoggingMiddleware(mux)); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

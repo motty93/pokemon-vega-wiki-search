@@ -4,35 +4,112 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="ポケモンベガ（ファンメイドROM）の図鑑データを検索・閲覧できるWebサイト。386匹のポケモンの種族値、技、入手方法を掲載。">
-  <meta property="og:title" content="ポケモンベガ 図鑑検索">
-  <meta property="og:description" content="ポケモンベガの図鑑データを高速検索。種族値・技・入手方法を網羅。">
-  <meta property="og:type" content="website">
+  <title>{{if .PageTitle}}{{.PageTitle}}{{else}}ポケモンベガ 図鑑検索 | 種族値・技・入手方法{{end}}</title>
+  <meta name="description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}ポケモンベガ（ファンメイドROM）の図鑑データを検索・閲覧できるWebサイト。386匹のポケモンの種族値、技、入手方法を掲載。{{end}}">
+  {{if .CanonicalURL}}<link rel="canonical" href="{{.CanonicalURL}}">{{end}}
+  <meta property="og:title" content="{{if .PageTitle}}{{.PageTitle}}{{else}}ポケモンベガ 図鑑検索{{end}}">
+  <meta property="og:description" content="{{if .PageDescription}}{{.PageDescription}}{{else}}ポケモンベガの図鑑データを高速検索。種族値・技・入手方法を網羅。{{end}}">
+  <meta property="og:type" content="{{if .OGType}}{{.OGType}}{{else}}website{{end}}">
   <meta property="og:locale" content="ja_JP">
-  <title>ポケモンベガ 図鑑検索</title>
+  {{if .CanonicalURL}}<meta property="og:url" content="{{.CanonicalURL}}">{{end}}
+  {{if .OGImage}}<meta property="og:image" content="{{.OGImage}}">{{end}}
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Noto Sans JP"', 'system-ui', '-apple-system', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script defer src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  {{if .JSONLD}}<script type="application/ld+json">{{.JSONLD}}</script>{{end}}
   <style>
-    .type-badge { @apply px-2 py-1 rounded text-white text-xs font-bold; min-width: 3rem; text-align: center; text-shadow: 0 1px 2px rgba(0,0,0,0.3); }
-    .stat-bar { @apply h-4 rounded-full; transition: width 0.3s ease; }
+    body { font-family: 'Noto Sans JP', system-ui, -apple-system, sans-serif; }
+    .type-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      border-radius: 9999px;
+      color: #fff;
+      font-size: 0.75rem;
+      font-weight: 700;
+      letter-spacing: 0.025em;
+      min-width: 3.5rem;
+      text-align: center;
+      text-shadow: 0 1px 2px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+    }
+    .stat-bar {
+      height: 1.25rem;
+      border-radius: 9999px;
+      transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
     .skip-link { position: absolute; top: -40px; left: 0; background: #000; color: #fff; padding: 8px 16px; z-index: 100; transition: top 0.2s; }
     .skip-link:focus { top: 0; }
+    .card-hover { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .card-hover:hover { transform: translateY(-4px); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
+    .pokemon-img { transition: transform 0.3s ease; }
+    .card-hover:hover .pokemon-img { transform: scale(1.1); }
+    .section-card {
+      background: #fff;
+      border-radius: 1rem;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+      border: 1px solid #f3f4f6;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 1.125rem;
+      font-weight: 700;
+      color: #1f2937;
+      padding-bottom: 0.75rem;
+      margin-bottom: 1rem;
+      border-bottom: 2px solid #f3f4f6;
+    }
+    .htmx-indicator { opacity: 0; pointer-events: none; transition: opacity 0.2s ease; }
+    .htmx-request .htmx-indicator, .htmx-request.htmx-indicator { opacity: 1; pointer-events: auto; }
+    @keyframes pulse-dot { 0%, 80%, 100% { transform: scale(0); } 40% { transform: scale(1); } }
+    .loading-dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #94a3b8; animation: pulse-dot 1.4s infinite ease-in-out both; }
+    .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+    .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+    .data-table { width: 100%; border-collapse: collapse; }
+    .data-table th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #6b7280;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      background: #f9fafb;
+    }
+    .data-table td {
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      color: #374151;
+    }
+    .data-table tbody tr {
+      border-top: 1px solid #f3f4f6;
+      transition: background-color 0.15s ease;
+    }
+    .data-table tbody tr:hover {
+      background-color: #f9fafb;
+    }
   </style>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gradient-to-br from-slate-50 to-gray-100 min-h-screen">
   <a href="#main-content" class="skip-link">メインコンテンツへスキップ</a>
-  <header class="bg-red-600 text-white shadow-lg" role="banner">
-    <div class="container mx-auto px-4 py-4">
-      <a href="/" class="text-2xl font-bold hover:text-red-200">ポケモンベガ 図鑑検索</a>
-    </div>
-  </header>
-  <main id="main-content" class="container mx-auto px-4 py-6" role="main">
-    {{template "content" .}}
-  </main>
-  <footer class="bg-gray-800 text-gray-400 text-center py-4 mt-8" role="contentinfo">
-    <p>ポケモンベガ Wiki Data &copy; 2024</p>
-  </footer>
+  {{template "content" .}}
 </body>
 </html>
 {{end}}

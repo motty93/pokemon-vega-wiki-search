@@ -2,10 +2,13 @@ package handler
 
 import (
 	"database/sql"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
+	"os"
 	"strconv"
+	"time"
 
 	mydb "github.com/motty93/pokemon-vega-wiki-crawler/internal/db"
 	"github.com/motty93/pokemon-vega-wiki-crawler/internal/model"
@@ -22,12 +25,19 @@ var typeColors = map[string]string{
 // Handler はHTTPハンドラー
 type Handler struct {
 	DB        *sql.DB
-	Templates *template.Template
+	Templates map[string]*template.Template
+	BaseURL   string
 }
 
-// New はHandlerを作成する
-func New(db *sql.DB) (*Handler, error) {
-	funcMap := template.FuncMap{
+func getBaseURL() string {
+	if u := os.Getenv("BASE_URL"); u != "" {
+		return u
+	}
+	return "https://pokemon-vega.example.com"
+}
+
+func newFuncMap() template.FuncMap {
+	return template.FuncMap{
 		"seq": func(n int) []int {
 			s := make([]int, n)
 			for i := range s {
@@ -56,12 +66,21 @@ func New(db *sql.DB) (*Handler, error) {
 			}
 		},
 		"statPercent": func(val int) int {
-			// 最大値255で正規化
 			pct := val * 100 / 255
 			if pct > 100 {
 				pct = 100
 			}
 			return pct
+		},
+		"statColor": func(name string) string {
+			colors := map[string]string{
+				"HP": "#ef4444", "攻撃": "#f97316", "防御": "#eab308",
+				"特攻": "#3b82f6", "特防": "#22c55e", "素早さ": "#ec4899",
+			}
+			if c, ok := colors[name]; ok {
+				return c
+			}
+			return "#6b7280"
 		},
 		"evHasAny": func(e model.EVYield) bool {
 			return e.HP > 0 || e.Attack > 0 || e.Defense > 0 ||
@@ -73,21 +92,43 @@ func New(db *sql.DB) (*Handler, error) {
 		"gt": func(a, b int) bool { return a > b },
 		"lt": func(a, b int) bool { return a < b },
 	}
-
-	tmpl, err := template.New("").Funcs(funcMap).ParseGlob("templates/*.html")
-	if err != nil {
-		return nil, err
-	}
-	return &Handler{DB: db, Templates: tmpl}, nil
 }
 
-// Index はトップページを表示する
-func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
-	types, _ := mydb.GetAllTypes(h.DB)
-	data := map[string]interface{}{
-		"Types": types,
+// New はHandlerを作成する
+func New(db *sql.DB) (*Handler, error) {
+	funcMap := newFuncMap()
+	templates := make(map[string]*template.Template)
+
+	// base.htmlをベースとするページテンプレート（Clone + ParseFilesで分離）
+	base, err := template.New("").Funcs(funcMap).ParseFiles("templates/base.html")
+	if err != nil {
+		return nil, fmt.Errorf("parse base.html: %w", err)
 	}
-	h.Templates.ExecuteTemplate(w, "index.html", data)
+
+	for _, page := range []string{"index.html", "pokemon_detail.html"} {
+		t, err := template.Must(base.Clone()).ParseFiles("templates/" + page)
+		if err != nil {
+			return nil, fmt.Errorf("parse %s: %w", page, err)
+		}
+		templates[page] = t
+	}
+
+	// パーシャルテンプレート（base不要）
+	searchResults, err := template.New("").Funcs(funcMap).ParseFiles("templates/search_results.html")
+	if err != nil {
+		return nil, fmt.Errorf("parse search_results.html: %w", err)
+	}
+	templates["search_results.html"] = searchResults
+
+	return &Handler{DB: db, Templates: templates, BaseURL: getBaseURL()}, nil
+}
+
+// Index はトップページを表示する（DB不要で高速レスポンス）
+func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
+	data := map[string]interface{}{
+		"CanonicalURL": h.BaseURL + "/",
+	}
+	h.Templates["index.html"].ExecuteTemplate(w, "base", data)
 }
 
 // PokemonDetail はポケモン詳細ページを表示する
@@ -105,7 +146,65 @@ func (h *Handler) PokemonDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	h.Templates.ExecuteTemplate(w, "pokemon_detail.html", detail)
+	go mydb.LogPageView(h.DB, id)
+
+	p := detail.Pokemon
+	typeText := p.Type1
+	if p.Type2 != "" {
+		typeText += "・" + p.Type2
+	}
+
+	pageTitle := fmt.Sprintf("%s (No.%03d) - ポケモンベガ図鑑 | 種族値・技・入手方法", p.Name, p.ID)
+	pageDesc := fmt.Sprintf("ポケモンベガの%s（No.%03d）の種族値、習得技、入手方法、進化情報。タイプ: %s。", p.Name, p.ID, typeText)
+	canonicalURL := fmt.Sprintf("%s/pokemon/%d", h.BaseURL, p.ID)
+
+	jsonLD := map[string]interface{}{
+		"@context":    "https://schema.org",
+		"@type":       "WebPage",
+		"name":        fmt.Sprintf("%s - ポケモンベガ図鑑", p.Name),
+		"description": pageDesc,
+		"url":         canonicalURL,
+		"breadcrumb": map[string]interface{}{
+			"@type": "BreadcrumbList",
+			"itemListElement": []map[string]interface{}{
+				{
+					"@type":    "ListItem",
+					"position": 1,
+					"name":     "トップ",
+					"item":     h.BaseURL + "/",
+				},
+				{
+					"@type":    "ListItem",
+					"position": 2,
+					"name":     fmt.Sprintf("%s (No.%03d)", p.Name, p.ID),
+					"item":     canonicalURL,
+				},
+			},
+		},
+	}
+	// og:image枠（将来的にOGP画像を設定）
+	// ogImage := fmt.Sprintf("%s/og/pokemon/%d.png", h.BaseURL, p.ID)
+
+	jsonLDBytes, _ := json.Marshal(jsonLD)
+
+	data := map[string]interface{}{
+		"Pokemon":         detail.Pokemon,
+		"Stats":           detail.Stats,
+		"EVYield":         detail.EVYield,
+		"Evolutions":      detail.Evolutions,
+		"Encounters":      detail.Encounters,
+		"LevelMoves":      detail.LevelMoves,
+		"TMMoves":         detail.TMMoves,
+		"TutorMoves":      detail.TutorMoves,
+		"EggMoves":        detail.EggMoves,
+		"PageTitle":       pageTitle,
+		"PageDescription": pageDesc,
+		"CanonicalURL":    canonicalURL,
+		"OGType":          "article",
+		// "OGImage":      ogImage,
+		"JSONLD": template.JS(string(jsonLDBytes)),
+	}
+	h.Templates["pokemon_detail.html"].ExecuteTemplate(w, "base", data)
 }
 
 // Search はhtmx部分レスポンスで検索結果を返す
@@ -134,9 +233,38 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if params.Query != "" {
+		go mydb.LogSearch(h.DB, params.Query, len(results))
+	}
+
 	data := map[string]interface{}{
 		"Results": results,
 		"Query":   params.Query,
 	}
-	h.Templates.ExecuteTemplate(w, "search_results.html", data)
+	h.Templates["search_results.html"].ExecuteTemplate(w, "search_results", data)
+}
+
+// Sitemap は /sitemap.xml を返す
+func (h *Handler) Sitemap(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+
+	now := time.Now().Format("2006-01-02")
+	fmt.Fprint(w, `<?xml version="1.0" encoding="UTF-8"?>`)
+	fmt.Fprint(w, `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">`)
+
+	fmt.Fprintf(w, `<url><loc>%s/</loc><lastmod>%s</lastmod><changefreq>weekly</changefreq><priority>1.0</priority></url>`, h.BaseURL, now)
+
+	for i := 1; i <= 386; i++ {
+		fmt.Fprintf(w, `<url><loc>%s/pokemon/%d</loc><lastmod>%s</lastmod><changefreq>monthly</changefreq><priority>0.8</priority></url>`, h.BaseURL, i, now)
+	}
+
+	fmt.Fprint(w, `</urlset>`)
+}
+
+// RobotsTxt は /robots.txt を返す
+func (h *Handler) RobotsTxt(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	fmt.Fprintf(w, "User-agent: *\nAllow: /\nDisallow: /search\n\nSitemap: %s/sitemap.xml\n", h.BaseURL)
 }

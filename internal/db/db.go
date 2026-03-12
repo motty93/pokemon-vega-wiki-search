@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
@@ -37,15 +39,23 @@ func Open() (*sql.DB, error) {
 
 // Migrate はマイグレーションを実行する
 func Migrate(db *sql.DB) error {
-	data, err := os.ReadFile("migrations/001_init.sql")
+	files, err := filepath.Glob("migrations/*.sql")
 	if err != nil {
-		return fmt.Errorf("failed to read migration file: %w", err)
+		return fmt.Errorf("failed to glob migration files: %w", err)
 	}
+	sort.Strings(files)
 
-	statements := splitSQL(string(data))
-	for _, stmt := range statements {
-		if _, err := db.Exec(stmt); err != nil {
-			return fmt.Errorf("failed to execute migration: %s: %w", stmt[:min(len(stmt), 80)], err)
+	for _, file := range files {
+		data, err := os.ReadFile(file)
+		if err != nil {
+			return fmt.Errorf("failed to read migration file %s: %w", file, err)
+		}
+
+		statements := splitSQL(string(data))
+		for _, stmt := range statements {
+			if _, err := db.Exec(stmt); err != nil {
+				return fmt.Errorf("failed to execute migration %s: %s: %w", file, stmt[:min(len(stmt), 80)], err)
+			}
 		}
 	}
 
