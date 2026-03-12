@@ -13,6 +13,20 @@
   <meta property="og:locale" content="ja_JP">
   {{if .CanonicalURL}}<meta property="og:url" content="{{.CanonicalURL}}">{{end}}
   {{if .OGImage}}<meta property="og:image" content="{{.OGImage}}">{{end}}
+  <script>
+    (function(){
+      var c = localStorage.getItem('vegadex-gradient');
+      if (!c) return;
+      try {
+        var g = JSON.parse(c);
+        var s = document.createElement('style');
+        s.textContent =
+          '.hero-bg{background:linear-gradient(135deg,rgba(255,255,255,.06) 25%,transparent 25%,transparent 50%,rgba(255,255,255,.06) 50%,rgba(255,255,255,.06) 75%,transparent 75%),linear-gradient(to right,'+g.dark+','+g.mid+','+g.light+')!important;background-size:40px 40px,100% 100%!important}'+
+          '.vega-header{background:linear-gradient(to right,'+g.dark+','+g.mid+','+g.light+')!important}';
+        document.head.appendChild(s);
+      } catch(e) {}
+    })();
+  </script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {

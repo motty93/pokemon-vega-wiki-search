@@ -276,12 +276,12 @@ func (h *Handler) PokemonDetail(w http.ResponseWriter, r *http.Request) {
 
 // Search はhtmx部分レスポンスで検索結果を返す
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
-	rawQuery := strings.TrimSpace(r.URL.Query().Get("q"))
+	rawQuery := normalizeFullWidth(strings.TrimSpace(r.URL.Query().Get("q")))
 	params := model.SearchParams{
 		Query:         rawQuery,
 		RomajiQuery:   romajiToKatakana(rawQuery),
 		KatakanaQuery: hiraganaToKatakana(rawQuery),
-		Type:          normalizeType(r.URL.Query().Get("type")),
+		Type:          normalizeType(normalizeFullWidth(r.URL.Query().Get("type"))),
 		MatchedTypes:  matchTypesByPrefix(rawQuery),
 	}
 
@@ -308,9 +308,33 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		go mydb.LogSearch(h.DB, params.Query, len(results))
 	}
 
+	// 最も多いタイプを集計してカラーを決定
+	dominantColor := ""
+	if len(results) > 0 {
+		typeCounts := make(map[string]int)
+		for _, r := range results {
+			typeCounts[r.Pokemon.Type1]++
+			if r.Pokemon.Type2 != "" {
+				typeCounts[r.Pokemon.Type2]++
+			}
+		}
+		maxCount := 0
+		dominantType := ""
+		for t, c := range typeCounts {
+			if c > maxCount {
+				maxCount = c
+				dominantType = t
+			}
+		}
+		if c, ok := typeColors[dominantType]; ok {
+			dominantColor = c
+		}
+	}
+
 	data := map[string]interface{}{
-		"Results": results,
-		"Query":   params.Query,
+		"Results":       results,
+		"Query":         params.Query,
+		"DominantColor": dominantColor,
 	}
 	h.Templates["search_results.html"].ExecuteTemplate(w, "search_results", data)
 }

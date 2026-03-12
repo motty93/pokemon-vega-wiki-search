@@ -5,6 +5,19 @@ import (
 	"unicode/utf8"
 )
 
+// normalizeFullWidth は全角英数字・記号（U+FF01〜U+FF5E）を半角に変換する。
+func normalizeFullWidth(s string) string {
+	var b strings.Builder
+	for _, r := range s {
+		if r >= 0xFF01 && r <= 0xFF5E {
+			b.WriteRune(r - 0xFEE0)
+		} else {
+			b.WriteRune(r)
+		}
+	}
+	return b.String()
+}
+
 // romajiToKatakana はローマ字入力の場合のみカタカナに変換する。
 // 変換できない場合は空文字を返す。
 func romajiToKatakana(s string) string {
