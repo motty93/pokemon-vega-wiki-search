@@ -166,8 +166,6 @@ func (d *PokemonDetail) Validate() error {
 	// 画像URL
 	if d.Pokemon.ImageURL == "" {
 		errors = append(errors, "image_url is empty")
-	} else if !strings.HasPrefix(d.Pokemon.ImageURL, "https://") {
-		errors = append(errors, fmt.Sprintf("invalid image_url: %q", d.Pokemon.ImageURL))
 	}
 
 	if len(errors) > 0 {

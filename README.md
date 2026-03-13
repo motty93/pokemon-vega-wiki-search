@@ -13,7 +13,7 @@
 | Webサーバー | net/http or chi |
 | フロントエンド | Go Template + [htmx](https://htmx.org/) + [Alpine.js](https://alpinejs.dev/) |
 | DB | [Turso](https://turso.tech/)（LibSQL / SQLite互換） |
-| 画像ストレージ | Google Cloud Storage |
+| 画像ストレージ | ローカル（static/images/pokemon/） |
 | デプロイ | Cloud Run（サーバー）/ Cloud Run Jobs（スクレイパー） |
 
 ## プロジェクト構成
@@ -27,7 +27,7 @@
 │   ├── scraper/         # スクレイピングロジック
 │   ├── model/           # 構造体定義（Pokemon, Move等）
 │   ├── handler/         # HTTPハンドラー（htmxレスポンス含む）
-│   └── storage/         # Cloud Storage画像アップロード
+│   └── storage/         # 画像ダウンロード（Wikiからローカルへ）
 ├── templates/           # Go Template（base, index, detail, partials）
 ├── static/              # CSS
 ├── migrations/          # SQLマイグレーションファイル
@@ -53,8 +53,6 @@ cp .env.example .env
 |---|---|
 | `TURSO_URL` | TursoデータベースURL |
 | `TURSO_AUTH_TOKEN` | Turso認証トークン |
-| `GCS_BUCKET_NAME` | GCSバケット名（画像保存先） |
-| `GOOGLE_APPLICATION_CREDENTIALS` | GCPサービスアカウントキーのパス |
 
 ローカル開発時はTursoの代わりにファイルベースSQLite（`file:pokemon.db`）を使用できます。
 
@@ -105,7 +103,7 @@ GET /search?q=&type=&speed_min=  # htmx部分レスポンス
 1. 図鑑一覧ページから全386匹のリンクを取得
 2. 各ポケモンページを巡回（1〜2秒間隔）
 3. 基本情報・種族値・進化・技・入手方法をパース
-4. 画像をGCSにアップロード
+4. 画像をローカル（static/images/pokemon/）にダウンロード
 5. 全データをDBに挿入
 
 ## DB構成

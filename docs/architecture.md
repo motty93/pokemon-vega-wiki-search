@@ -17,7 +17,7 @@
 | Webサーバー | Go（net/http or chi） |
 | フロントエンド | Go Template + htmx + Alpine.js |
 | DB | Turso（LibSQL / SQLite互換） |
-| 画像ストレージ | Google Cloud Storage |
+| 画像ストレージ | ローカル（static/images/pokemon/） |
 | スクレイピング実行 | Cloud Run Jobs（手動実行） |
 | Webサーバーデプロイ | Cloud Run |
 
@@ -37,7 +37,7 @@
 │   ├── scraper/         # スクレイピングロジック
 │   ├── model/           # 構造体定義（Pokemon, Move等）
 │   ├── handler/         # HTTPハンドラー（htmxレスポンス含む）
-│   └── storage/         # Cloud Storage画像アップロード
+│   └── storage/         # 画像ダウンロード（Wikiからローカルへ）
 ├── templates/            # Go Template（base, index, detail, partials）
 ├── static/               # CSS（Tailwind CDNで可）
 ├── migrations/           # SQLマイグレーションファイル
@@ -176,7 +176,7 @@ CREATE VIRTUAL TABLE pokemon_fts USING fts5(
    - 野生持ち物（50%・5%）
    - 習得技4種（レベルアップ・技マシン・教え技・タマゴ技）
    - 画像URL
-4. 画像をCloud Storageにアップロードし、DBのimage_urlを更新
+4. 画像をローカル（static/images/pokemon/）にダウンロードし、DBのimage_urlを更新
 5. 全データをTurso（LibSQL）に挿入
 
 ### 環境変数
@@ -184,8 +184,6 @@ CREATE VIRTUAL TABLE pokemon_fts USING fts5(
 ```
 TURSO_URL=
 TURSO_AUTH_TOKEN=
-GCS_BUCKET_NAME=
-GOOGLE_APPLICATION_CREDENTIALS=
 ```
 
 ---
@@ -253,7 +251,7 @@ ENTRYPOINT ["/scraper"]
 1. **DBマイグレーション** `migrations/001_init.sql` を作成しTursoに適用
 2. **スクレイパー実装** ローカルでSQLiteに対して動作確認してからTursoに切り替え
 3. **Webサーバー + 検索UI** Go Template + htmxで検索・詳細ページを実装
-4. **Cloud Storage連携** 画像をGCSにアップロードする処理を追加
+4. **画像ダウンロード** Wikiから画像をローカルにダウンロードする処理を追加
 5. **Dockerize + Cloud Runデプロイ** server / scraper それぞれのイメージをビルド・デプロイ
 6. **Cloud Run Jobs登録** scraperをCloud Run Jobsとして手動実行できるよう設定
 
@@ -265,4 +263,4 @@ ENTRYPOINT ["/scraper"]
 - TursoのLibSQLドライバは `github.com/tursodatabase/libsql-client-go` を使用
 - collyのパーサーはテーブル構造をベースに実装（各セクションのテーブルヘッダーで判定）
 - ローカル開発時はTursoの代わりにファイルベースのSQLite（`file:pokemon.db`）を使うと便利
-- 画像URLはスクレイピング時点ではWikiのURLを一時保存し、GCSアップロード後に上書き更新する
+- 画像URLはスクレイピング時点ではWikiのURLを一時保存し、ローカルダウンロード後にパスを更新する
