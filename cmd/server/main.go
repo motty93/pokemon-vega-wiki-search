@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/go-chi/chi/v5"
 	mydb "github.com/motty93/pokemon-vega-wiki-crawler/internal/db"
 	"github.com/motty93/pokemon-vega-wiki-crawler/internal/handler"
 )
@@ -25,13 +26,20 @@ func main() {
 		log.Fatalf("Failed to create handler: %v", err)
 	}
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET /", h.Index)
-	mux.HandleFunc("GET /pokemon/{id}", h.PokemonDetail)
-	mux.HandleFunc("GET /search", h.Search)
-	mux.HandleFunc("GET /sitemap.xml", h.Sitemap)
-	mux.HandleFunc("GET /robots.txt", h.RobotsTxt)
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
+	r := chi.NewRouter()
+	r.Use(handler.LoggingMiddleware)
+
+	r.Get("/", h.Index)
+	r.Get("/pokemon/{id}", h.PokemonDetail)
+	r.Get("/search", h.Search)
+	r.Get("/sitemap.xml", h.Sitemap)
+	r.Get("/robots.txt", h.RobotsTxt)
+
+	staticHandler := http.StripPrefix("/static/", http.FileServer(http.Dir("static")))
+	r.Get("/static/*", func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Cache-Control", "public, max-age=2592000") // 30日
+		staticHandler.ServeHTTP(w, req)
+	})
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -39,7 +47,7 @@ func main() {
 	}
 
 	log.Printf("Server starting on :%s", port)
-	if err := http.ListenAndServe(":"+port, handler.LoggingMiddleware(mux)); err != nil {
+	if err := http.ListenAndServe(":"+port, r); err != nil {
 		log.Fatalf("Server failed: %v", err)
 	}
 }

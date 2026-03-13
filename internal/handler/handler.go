@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	mydb "github.com/motty93/pokemon-vega-wiki-crawler/internal/db"
 	"github.com/motty93/pokemon-vega-wiki-crawler/internal/model"
 )
@@ -200,7 +201,7 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 
 // PokemonDetail はポケモン詳細ページを表示する
 func (h *Handler) PokemonDetail(w http.ResponseWriter, r *http.Request) {
-	idStr := r.PathValue("id")
+	idStr := chi.URLParam(r, "id")
 	id, err := strconv.Atoi(idStr)
 	if err != nil {
 		http.Error(w, "Invalid pokemon ID", http.StatusBadRequest)
