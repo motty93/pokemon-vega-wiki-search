@@ -1,0 +1,10 @@
+.git
+.env
+bin/
+*.sql
+pokemon_dump*
+cloudbuild*.yml
+compose*.yml
+Dockerfile.*
+CLAUDE.md
+docs/

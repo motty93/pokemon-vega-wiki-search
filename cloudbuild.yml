@@ -1,0 +1,47 @@
+steps:
+  # 1. Build
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'build'
+      - '-f'
+      - 'Dockerfile'
+      - '-t'
+      - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/vega-pokedex/server:$SHORT_SHA'
+      - '-t'
+      - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/vega-pokedex/server:latest'
+      - '.'
+
+  # 2. Push
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '--all-tags'
+      - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/vega-pokedex/server'
+
+  # 3. Deploy to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'deploy'
+      - 'vega-pokedex'
+      - '--image'
+      - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/vega-pokedex/server:$SHORT_SHA'
+      - '--region'
+      - 'asia-northeast1'
+      - '--platform'
+      - 'managed'
+      - '--set-env-vars'
+      - 'DATABASE_URL=/data/pokemon.db'
+      - '--memory'
+      - '256Mi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '3'
+      - '--allow-unauthenticated'
+
+images:
+  - 'asia-northeast1-docker.pkg.dev/$PROJECT_ID/vega-pokedex/server'

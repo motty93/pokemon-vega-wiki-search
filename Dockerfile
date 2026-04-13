@@ -1,4 +1,4 @@
-FROM golang:1.23 AS builder
+FROM golang:1.25 AS builder
 WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
@@ -11,4 +11,5 @@ COPY --from=builder /app/server /server
 COPY --from=builder /app/templates /templates
 COPY --from=builder /app/static /static
 COPY --from=builder /app/migrations /migrations
+COPY --from=builder /app/data/pokemon.db /data/pokemon.db
 ENTRYPOINT ["/server"]

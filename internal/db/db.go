@@ -9,11 +9,37 @@ import (
 	"strings"
 
 	_ "github.com/tursodatabase/libsql-client-go/libsql"
+	_ "modernc.org/sqlite"
 )
 
-// Open はTursoデータベースに接続する
-// 環境変数 TURSO_URL, TURSO_AUTH_TOKEN が必須
+// Open はデータベースに接続する
+// DATABASE_URL が設定されていればローカルSQLite、なければTurso（TURSO_URL, TURSO_AUTH_TOKEN）を使用
 func Open() (*sql.DB, error) {
+	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+		return openSQLite(dbURL)
+	}
+	return openTurso()
+}
+
+func openSQLite(dbURL string) (*sql.DB, error) {
+	db, err := sql.Open("sqlite", dbURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open sqlite database: %w", err)
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, fmt.Errorf("failed to ping sqlite database: %w", err)
+	}
+
+	// WALモードとFTS5有効化
+	if _, err := db.Exec("PRAGMA journal_mode=WAL"); err != nil {
+		return nil, fmt.Errorf("failed to set WAL mode: %w", err)
+	}
+
+	return db, nil
+}
+
+func openTurso() (*sql.DB, error) {
 	tursoURL := os.Getenv("TURSO_URL")
 	if tursoURL == "" {
 		return nil, fmt.Errorf("TURSO_URL is required")
