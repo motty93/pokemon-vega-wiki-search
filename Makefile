@@ -1,23 +1,15 @@
 include .env
 export
 
-.PHONY: build-server build-scraper dev scraper test clean
+.PHONY: build dev test clean deploy
 
 # ビルド
-build-server:
+build:
 	CGO_ENABLED=0 go build -o bin/server ./cmd/server
-
-build-scraper:
-	CGO_ENABLED=0 go build -o bin/scraper ./cmd/scraper
-
-build: build-server build-scraper
 
 # ローカル実行（Air: ホットリロード）
 dev:
 	air
-
-scraper:
-	go run ./cmd/scraper
 
 # テスト
 test:
@@ -26,3 +18,7 @@ test:
 # クリーン
 clean:
 	rm -rf bin/
+
+# Cloud Runへデプロイ（Cloud Build経由）
+deploy:
+	gcloud builds submit --config=cloudbuild.yml
