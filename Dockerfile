@@ -3,13 +3,13 @@ WORKDIR /app
 COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
-RUN CGO_ENABLED=0 go build -o server ./cmd/server
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o server ./cmd/server
 
-FROM scratch
-COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
-COPY --from=builder /app/server /server
-COPY --from=builder /app/templates /templates
-COPY --from=builder /app/static /static
-COPY --from=builder /app/migrations /migrations
-COPY --from=builder /app/data/pokemon.db /data/pokemon.db
+FROM gcr.io/distroless/static-debian12:nonroot
+COPY --from=builder --chown=nonroot:nonroot /app/server /server
+COPY --from=builder --chown=nonroot:nonroot /app/templates /templates
+COPY --from=builder --chown=nonroot:nonroot /app/static /static
+COPY --from=builder --chown=nonroot:nonroot /app/migrations /migrations
+COPY --from=builder --chown=nonroot:nonroot /app/data/pokemon.db /data/pokemon.db
+USER nonroot:nonroot
 ENTRYPOINT ["/server"]

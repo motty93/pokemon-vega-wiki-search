@@ -92,9 +92,10 @@ func normalizeType(q string) string {
 
 // Handler はHTTPハンドラー
 type Handler struct {
-	DB        *sql.DB
-	Templates map[string]*template.Template
-	BaseURL   string
+	DB          *sql.DB
+	AnalyticsDB *sql.DB
+	Templates   map[string]*template.Template
+	BaseURL     string
 }
 
 func getBaseURL() string {
@@ -163,7 +164,7 @@ func newFuncMap() template.FuncMap {
 }
 
 // New はHandlerを作成する
-func New(db *sql.DB) (*Handler, error) {
+func New(db, analyticsDB *sql.DB) (*Handler, error) {
 	funcMap := newFuncMap()
 	templates := make(map[string]*template.Template)
 
@@ -188,7 +189,7 @@ func New(db *sql.DB) (*Handler, error) {
 	}
 	templates["search_results.html"] = searchResults
 
-	return &Handler{DB: db, Templates: templates, BaseURL: getBaseURL()}, nil
+	return &Handler{DB: db, AnalyticsDB: analyticsDB, Templates: templates, BaseURL: getBaseURL()}, nil
 }
 
 // Index はトップページを表示する（DB不要で高速レスポンス）
@@ -214,7 +215,7 @@ func (h *Handler) PokemonDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go mydb.LogPageView(h.DB, id)
+	go mydb.LogPageView(h.AnalyticsDB, id)
 
 	p := detail.Pokemon
 	typeText := p.Type1
@@ -306,7 +307,7 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if params.Query != "" {
-		go mydb.LogSearch(h.DB, params.Query, len(results))
+		go mydb.LogSearch(h.AnalyticsDB, params.Query, len(results))
 	}
 
 	// 最も多いタイプを集計してカラーを決定

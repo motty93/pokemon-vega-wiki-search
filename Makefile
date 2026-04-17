@@ -1,7 +1,7 @@
 include .env
 export
 
-.PHONY: build dev test clean deploy
+.PHONY: build dev test clean deploy setup-gcp
 
 # ビルド
 build:
@@ -19,6 +19,11 @@ test:
 clean:
 	rm -rf bin/
 
+# GCP初期セットアップ（初回のみ）
+setup-gcp:
+	./scripts/setup-gcp.sh
+
 # Cloud Runへデプロイ（Cloud Build経由）
 deploy:
-	gcloud builds submit --config=cloudbuild.yml
+	gcloud builds submit --config=cloudbuild.yml \
+		--substitutions=SHORT_SHA=$(shell git rev-parse --short HEAD)

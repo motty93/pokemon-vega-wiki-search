@@ -6,6 +6,5 @@ coverage
 *.log
 /server
 /scraper
-/static/images
 *.db-shm
 *.db-wal
