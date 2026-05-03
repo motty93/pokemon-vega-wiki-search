@@ -51,6 +51,7 @@ func main() {
 
 	r := chi.NewRouter()
 	r.Use(handler.LoggingMiddleware)
+	r.Use(handler.BlockAIBotsMiddleware)
 	r.Use(handler.SecurityHeadersMiddleware)
 	r.Use(handler.BodyLimitMiddleware(1 << 20)) // 1MB
 
