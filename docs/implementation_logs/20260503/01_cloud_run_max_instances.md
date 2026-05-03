@@ -49,9 +49,15 @@ gcloud run services describe vega-pokedex \
 # => 5
 ```
 
+### cloudbuild.yml の同期
+
+`cloudbuild.yml` の `gcloud run deploy` ステップに `--max-instances 3` がハードコードされていたため、
+次回 Cloud Build 経由のデプロイで 3 に戻ってしまう問題があった。
+`cloudbuild.yml` の値も `5` に更新して同期。
+
 ## 関連情報
 
 - 1 インスタンスあたりデフォルトで 80 並列リクエスト処理可能 → 5 インスタンスで同時 400 リクエスト処理可能
 - 上限超過分のリクエストは 429 Too Many Requests が返る
-- トラフィック増加や正常クローラーで 429 が頻発する場合は `10`〜`20` への引き上げを検討
+- トラフィック増加や正常クローラーで 429 が頻発する場合は `10`〜`20` への引き上げを検討（`cloudbuild.yml` も合わせて更新すること）
 - `min-instances=0` のままなのでアイドル時のコストは発生しない（コールドスタート許容）

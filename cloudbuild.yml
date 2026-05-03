@@ -44,7 +44,7 @@ steps:
       - '--min-instances'
       - '0'
       - '--max-instances'
-      - '3'
+      - '5'
       - '--allow-unauthenticated'
 
 images:
