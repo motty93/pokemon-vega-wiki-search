@@ -360,8 +360,71 @@ func (h *Handler) Sitemap(w http.ResponseWriter, r *http.Request) {
 }
 
 // RobotsTxt は /robots.txt を返す
+// AI学習・LLM用クローラーは個別にDisallow、通常検索・SNSプレビュー系は許可。
 func (h *Handler) RobotsTxt(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=86400")
-	fmt.Fprintf(w, "User-agent: *\nAllow: /\nDisallow: /search\n\nSitemap: %s/sitemap.xml\n", h.BaseURL)
+	fmt.Fprintf(w, `User-agent: GPTBot
+		Disallow: /
+
+		User-agent: ChatGPT-User
+		Disallow: /
+
+		User-agent: OAI-SearchBot
+		Disallow: /
+
+		User-agent: ClaudeBot
+		Disallow: /
+
+		User-agent: Claude-Web
+		Disallow: /
+
+		User-agent: anthropic-ai
+		Disallow: /
+
+		User-agent: Google-Extended
+		Disallow: /
+
+		User-agent: CCBot
+		Disallow: /
+
+		User-agent: PerplexityBot
+		Disallow: /
+
+		User-agent: Meta-ExternalAgent
+		Disallow: /
+
+		User-agent: Meta-ExternalFetcher
+		Disallow: /
+
+		User-agent: Bytespider
+		Disallow: /
+
+		User-agent: Amazonbot
+		Disallow: /
+
+		User-agent: Applebot-Extended
+		Disallow: /
+
+		User-agent: cohere-ai
+		Disallow: /
+
+		User-agent: Diffbot
+		Disallow: /
+
+		User-agent: ImagesiftBot
+		Disallow: /
+
+		User-agent: Omgilibot
+		Disallow: /
+
+		User-agent: Timpibot
+		Disallow: /
+
+		User-agent: *
+		Allow: /
+		Disallow: /search
+
+		Sitemap: %s/sitemap.xml
+	`, h.BaseURL)
 }
