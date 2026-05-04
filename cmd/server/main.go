@@ -70,9 +70,11 @@ func main() {
 		r.Get("/search", h.Search)
 	})
 
-	staticHandler := http.StripPrefix("/static/", http.FileServer(http.Dir("static")))
+	fileServer := http.FileServer(http.Dir("static"))
+	staticHandler := http.StripPrefix("/static/", handler.ImageCacheControlMiddleware(fileServer))
 	r.Get("/static/*", func(w http.ResponseWriter, req *http.Request) {
-		w.Header().Set("Cache-Control", "public, max-age=2592000") // 30日
+		// デフォルト30日。画像系は ImageCacheControlMiddleware で 1年 immutable に上書きされる
+		w.Header().Set("Cache-Control", "public, max-age=2592000")
 		staticHandler.ServeHTTP(w, req)
 	})
 
