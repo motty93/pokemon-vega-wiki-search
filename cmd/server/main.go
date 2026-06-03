@@ -60,6 +60,7 @@ func main() {
 	r.Use(httprate.LimitByRealIP(300, time.Minute))
 
 	r.Get("/", h.Index)
+	r.Get("/playground", h.Playground)
 	r.Get("/pokemon/{id}", h.PokemonDetail)
 	r.Get("/sitemap.xml", h.Sitemap)
 	r.Get("/robots.txt", h.RobotsTxt)

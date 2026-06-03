@@ -1,0 +1,360 @@
+{{define "content"}}
+<style>
+  [x-cloak] { display: none !important; }
+  #er-mini svg, #er-full svg { width: 100%; height: auto; }
+  #er-mini { cursor: zoom-in; }
+</style>
+<div class="min-h-screen">
+  <header class="text-white shadow-lg" style="background: linear-gradient(to right, #065f46, #059669, #0d9488)">
+    <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2 hover:opacity-90 transition-opacity">
+        <span class="text-lg font-black">&larr; 図鑑にもどる</span>
+      </a>
+      <span class="text-sm font-bold opacity-90">SQL Playground</span>
+    </div>
+  </header>
+
+  <main id="main-content" class="max-w-7xl mx-auto px-4 py-6">
+    <div class="mb-4">
+      <h1 class="text-2xl font-black text-gray-800 mb-1">
+        SQL Playground
+        <span class="text-xs font-normal text-gray-500">powered by DuckDB-WASM</span>
+      </h1>
+      <p class="text-sm text-gray-600 leading-relaxed">
+        ブラウザの中でSQLを実行します。データは parquet（合計約140KB）をその場で読み込み、
+        クエリはサーバーに送信されません。<code class="text-emerald-700">SELECT</code> で自由に集計・結合できます。
+      </p>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4"
+         x-data="{ open: null, tables: [
+           { name: 'pokemon', ja: 'ポケモン基本情報', cols: ['id','name','type1','type2','ability1','ability2','egg_group1','egg_group2','hatch_steps','gender_ratio','catch_rate','base_friendship','base_exp','exp_type','item_50pct','item_5pct','image_url'] },
+           { name: 'base_stats', ja: '種族値', cols: ['pokemon_id','hp','attack','defense','sp_attack','sp_defense','speed'] },
+           { name: 'ev_yield', ja: '努力値', cols: ['pokemon_id','hp','attack','defense','sp_attack','sp_defense','speed'] },
+           { name: 'evolution', ja: '進化チェーン', cols: ['id','from_pokemon_id','to_pokemon_id','condition'] },
+           { name: 'move', ja: '技マスタ', cols: ['id','name'] },
+           { name: 'learnset_level', ja: 'レベルアップ習得技', cols: ['pokemon_id','level','move_id'] },
+           { name: 'learnset_tm', ja: 'わざマシン習得技', cols: ['pokemon_id','tm_number','move_id'] },
+           { name: 'learnset_tutor', ja: '教え技', cols: ['pokemon_id','move_id'] },
+           { name: 'learnset_egg', ja: 'タマゴ技', cols: ['pokemon_id','move_id','parent_chain'] },
+           { name: 'encounter', ja: '入手方法', cols: ['id','pokemon_id','location','method','note'] }
+         ] }">
+
+      <aside class="lg:col-span-1 space-y-4">
+        <div class="section-card !p-4 !mb-0">
+          <h2 class="font-bold text-gray-700 mb-2 text-sm">テーブル（クリックで列表示）</h2>
+          <ul class="space-y-1 text-xs">
+            <template x-for="t in tables" :key="t.name">
+              <li>
+                <button @click="open = (open === t.name ? null : t.name)"
+                        class="w-full text-left py-0.5 hover:underline">
+                  <span class="font-mono text-emerald-700" x-text="t.name"></span>
+                  <span class="text-gray-400 text-[11px]" x-text="'（' + t.ja + '）'"></span>
+                </button>
+                <ul x-show="open === t.name" x-cloak class="pl-3 pb-1 text-gray-500 font-mono space-y-0.5">
+                  <template x-for="c in t.cols" :key="c"><li x-text="c"></li></template>
+                </ul>
+              </li>
+            </template>
+          </ul>
+        </div>
+
+        <div class="section-card !p-4 !mb-0">
+          <h2 class="font-bold text-gray-700 mb-2 text-sm">サンプルクエリ</h2>
+          <div class="space-y-2 text-xs">
+            <button class="sample-btn block w-full text-left px-3 py-2 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors"
+              data-sql="SELECT p.id, p.name, p.type1, p.type2,
+       b.hp + b.attack + b.defense + b.sp_attack + b.sp_defense + b.speed AS total
+FROM pokemon p
+JOIN base_stats b ON p.id = b.pokemon_id
+ORDER BY total DESC
+LIMIT 20;">種族値合計ランキング</button>
+
+            <button class="sample-btn block w-full text-left px-3 py-2 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors"
+              data-sql="SELECT p.type1 AS type,
+       COUNT(*) AS n,
+       ROUND(AVG(b.hp + b.attack + b.defense + b.sp_attack + b.sp_defense + b.speed), 1) AS avg_total
+FROM pokemon p
+JOIN base_stats b ON p.id = b.pokemon_id
+GROUP BY p.type1
+ORDER BY avg_total DESC;">タイプ別の平均種族値</button>
+
+            <button class="sample-btn block w-full text-left px-3 py-2 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors"
+              data-sql="SELECT m.name AS move,
+       COUNT(DISTINCT l.pokemon_id) AS learners
+FROM move m
+JOIN learnset_level l ON m.id = l.move_id
+GROUP BY m.name
+ORDER BY learners DESC
+LIMIT 20;">多くが覚えるレベル技 TOP20</button>
+
+            <button class="sample-btn block w-full text-left px-3 py-2 rounded-lg bg-emerald-50 text-emerald-800 hover:bg-emerald-100 transition-colors"
+              data-sql="SELECT location, COUNT(*) AS n
+FROM encounter
+GROUP BY location
+ORDER BY n DESC
+LIMIT 20;">入手場所ごとの出現数</button>
+          </div>
+        </div>
+
+        <div x-data="{ erOpen: false }">
+          <div class="section-card !p-4 !mb-0">
+            <h2 class="font-bold text-gray-700 mb-2 text-sm">ER図（クリックで拡大）</h2>
+            <div id="er-mini" @click="erOpen = true">
+              <p class="text-xs text-gray-400">読み込み中…</p>
+            </div>
+          </div>
+
+          <div x-show="erOpen" x-cloak @click="erOpen = false"
+               class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div @click.stop class="bg-white rounded-xl shadow-2xl p-4 max-w-5xl w-full max-h-[90vh] overflow-auto">
+              <div class="flex justify-between items-center mb-3">
+                <h3 class="font-bold text-gray-700">ER図</h3>
+                <button @click="erOpen = false" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+              </div>
+              <div id="er-full" class="overflow-auto"></div>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <section class="lg:col-span-3 space-y-3">
+        <div class="section-card !p-3 !mb-0">
+          <textarea id="sql" rows="9" spellcheck="false"
+            class="w-full font-mono text-sm border border-gray-200 rounded-lg p-3 bg-gray-50 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white"></textarea>
+          <div class="flex items-center gap-3 mt-2">
+            <button id="run" disabled
+              class="px-5 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+              実行 <span class="opacity-70 text-xs font-normal">Ctrl+Enter</span>
+            </button>
+            <button id="cancel"
+              class="hidden px-5 py-2 bg-red-600 text-white rounded-lg font-bold text-sm hover:bg-red-700 transition-colors">
+              中止
+            </button>
+            <span id="status" class="text-sm text-gray-500">DuckDB を初期化中…</span>
+          </div>
+        </div>
+
+        <div class="section-card !p-0 !mb-0 overflow-auto" style="max-height: 60vh">
+          <div id="result" class="overflow-auto"></div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/+esm';
+
+  mermaid.initialize({ startOnLoad: false, theme: 'neutral' });
+
+  const ER_DEF = `erDiagram
+  pokemon ||--|| base_stats : stats
+  pokemon ||--|| ev_yield : ev
+  pokemon ||--o{ evolution : evo
+  pokemon ||--o{ learnset_level : lv
+  pokemon ||--o{ learnset_tm : tm
+  pokemon ||--o{ learnset_tutor : tutor
+  pokemon ||--o{ learnset_egg : egg
+  pokemon ||--o{ encounter : enc
+  move ||--o{ learnset_level : m
+  move ||--o{ learnset_tm : m
+  move ||--o{ learnset_tutor : m
+  move ||--o{ learnset_egg : m`;
+
+  try {
+    const mini = await mermaid.render('er-svg-mini', ER_DEF);
+    document.getElementById('er-mini').innerHTML = mini.svg;
+    const full = await mermaid.render('er-svg-full', ER_DEF);
+    document.getElementById('er-full').innerHTML = full.svg;
+  } catch (e) {
+    document.getElementById('er-mini').innerHTML =
+      '<p class="text-xs text-red-600">ER図の描画に失敗: ' + e.message + '</p>';
+  }
+</script>
+
+<script type="module">
+  import * as duckdb from 'https://cdn.jsdelivr.net/npm/@duckdb/duckdb-wasm@1/+esm';
+
+  // parquet ファイル名（= ビュー名）。既存スキーマのテーブル名と一致させる。
+  const TABLES = [
+    'pokemon', 'base_stats', 'ev_yield', 'evolution', 'move',
+    'learnset_level', 'learnset_tm', 'learnset_tutor', 'learnset_egg', 'encounter',
+  ];
+  const QUERY_TIMEOUT_MS = 10000; // この時間を超えたクエリは強制中断する
+  const MAX_RENDER_ROWS = 2000;   // 描画する最大行数（DOM肥大の防止）
+
+  const sqlEl = document.getElementById('sql');
+  const runBtn = document.getElementById('run');
+  const cancelBtn = document.getElementById('cancel');
+  const statusEl = document.getElementById('status');
+  const resultEl = document.getElementById('result');
+
+  const DEFAULT_SQL = `SELECT p.id, p.name, p.type1, p.type2,
+       b.hp + b.attack + b.defense + b.sp_attack + b.sp_defense + b.speed AS total
+FROM pokemon p
+JOIN base_stats b ON p.id = b.pokemon_id
+ORDER BY total DESC
+LIMIT 20;`;
+  sqlEl.value = DEFAULT_SQL;
+
+  let db = null;
+  let worker = null;
+  let conn = null;
+  let running = false;
+  let timeoutId = null;
+
+  function escapeHtml(s) {
+    return s.replace(/[&<>"']/g, (c) => (
+      { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+    ));
+  }
+
+  function renderTable(table) {
+    const cols = table.schema.fields.map((f) => f.name);
+    const rows = table.toArray().slice(0, MAX_RENDER_ROWS); // 先頭のみ描画
+    if (rows.length === 0) {
+      resultEl.innerHTML = '<p class="p-4 text-sm text-gray-500">0 行</p>';
+      return;
+    }
+    let html = '<table class="data-table"><thead><tr>';
+    for (const c of cols) html += '<th>' + escapeHtml(c) + '</th>';
+    html += '</tr></thead><tbody>';
+    for (const r of rows) {
+      html += '<tr>';
+      for (const c of cols) {
+        const v = r[c];
+        html += '<td>' + (v === null || v === undefined ? '' : escapeHtml(String(v))) + '</td>';
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    resultEl.innerHTML = html;
+  }
+
+  // DuckDB-WASM を初期化し、各 parquet を登録して既存テーブル名のビューを張る。
+  // 初回起動と、中断後のリセットの両方で使う。
+  async function setupDuckDB() {
+    const bundles = duckdb.getJsDelivrBundles();
+    const bundle = await duckdb.selectBundle(bundles);
+    // jsdelivr のワーカーをそのまま new Worker するとクロスオリジン制約に当たるため、
+    // 同一オリジンの blob から importScripts する定番パターンを使う。
+    const workerUrl = URL.createObjectURL(
+      new Blob(['importScripts("' + bundle.mainWorker + '");'], { type: 'text/javascript' })
+    );
+    worker = new Worker(workerUrl);
+    db = new duckdb.AsyncDuckDB(new duckdb.ConsoleLogger(), worker);
+    await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
+    URL.revokeObjectURL(workerUrl);
+    conn = await db.connect();
+
+    for (const t of TABLES) {
+      const res = await fetch('/static/data/' + t + '.parquet');
+      if (!res.ok) throw new Error('fetch ' + t + '.parquet: ' + res.status);
+      await db.registerFileBuffer(t + '.parquet', new Uint8Array(await res.arrayBuffer()));
+      await conn.query("CREATE OR REPLACE VIEW " + t + " AS SELECT * FROM parquet_scan('" + t + ".parquet')");
+    }
+  }
+
+  // 中断時は Worker ごと作り直す（DuckDB-WASM はクエリ単体のキャンセルが難しいため、
+  // 走り続けるクエリを確実に止めるには Worker を terminate するのが堅い）。
+  async function resetDuckDB(reason) {
+    if (worker) {
+      worker.terminate();
+      worker = null;
+    }
+    conn = null;
+    db = null;
+    runBtn.disabled = true;
+    cancelBtn.classList.add('hidden');
+    statusEl.textContent = reason + '（再初期化中…）';
+    try {
+      await setupDuckDB();
+      statusEl.textContent = reason;
+    } catch (e) {
+      statusEl.innerHTML = '<span class="text-red-600">再初期化失敗: ' + escapeHtml(e.message) + '</span>';
+    } finally {
+      runBtn.disabled = conn === null;
+    }
+  }
+
+  function setRunning(on) {
+    running = on;
+    runBtn.disabled = on;
+    cancelBtn.classList.toggle('hidden', !on);
+  }
+
+  async function run() {
+    if (!conn || running) return;
+    const sql = sqlEl.value.trim();
+    if (!sql) return;
+    setRunning(true);
+    statusEl.textContent = '実行中…';
+    const t0 = performance.now();
+
+    let timedOut = false;
+    const queryPromise = conn.query(sql);
+    queryPromise.catch(() => {}); // 中断時に後追いで来る reject を握り潰す
+    const timeoutPromise = new Promise((_, reject) => {
+      timeoutId = setTimeout(() => {
+        timedOut = true;
+        reject(new Error('__timeout__'));
+      }, QUERY_TIMEOUT_MS);
+    });
+
+    try {
+      const table = await Promise.race([queryPromise, timeoutPromise]);
+      clearTimeout(timeoutId);
+      const ms = (performance.now() - t0).toFixed(1);
+      renderTable(table);
+      statusEl.textContent = table.numRows + ' 行 / ' + ms + ' ms'
+        + (table.numRows > MAX_RENDER_ROWS ? '（先頭 ' + MAX_RENDER_ROWS + ' 行を表示）' : '');
+      setRunning(false);
+    } catch (e) {
+      clearTimeout(timeoutId);
+      setRunning(false);
+      resultEl.innerHTML = '';
+      if (timedOut) {
+        await resetDuckDB('タイムアウト（' + (QUERY_TIMEOUT_MS / 1000) + '秒）で中断しました。クエリを見直してください');
+      } else {
+        statusEl.innerHTML = '<span class="text-red-600">エラー: ' + escapeHtml(e.message) + '</span>';
+      }
+    }
+  }
+
+  async function cancel() {
+    if (!running) return;
+    clearTimeout(timeoutId);
+    setRunning(false);
+    resultEl.innerHTML = '';
+    await resetDuckDB('中止しました');
+  }
+
+  async function init() {
+    statusEl.textContent = 'DuckDB を初期化中…';
+    await setupDuckDB();
+    runBtn.disabled = false;
+    statusEl.textContent = '準備完了。';
+    run(); // 初期クエリを自動実行
+  }
+
+  runBtn.addEventListener('click', run);
+  cancelBtn.addEventListener('click', cancel);
+  sqlEl.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      run();
+    }
+  });
+  for (const btn of document.querySelectorAll('.sample-btn')) {
+    btn.addEventListener('click', () => {
+      sqlEl.value = btn.dataset.sql;
+      run();
+    });
+  }
+
+  init().catch((e) => {
+    statusEl.innerHTML = '<span class="text-red-600">初期化失敗: ' + escapeHtml(e.message) + '</span>';
+  });
+</script>
+{{end}}

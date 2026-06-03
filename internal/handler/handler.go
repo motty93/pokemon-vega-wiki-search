@@ -174,7 +174,7 @@ func New(db, analyticsDB *sql.DB) (*Handler, error) {
 		return nil, fmt.Errorf("parse base.html: %w", err)
 	}
 
-	for _, page := range []string{"index.html", "pokemon_detail.html"} {
+	for _, page := range []string{"index.html", "pokemon_detail.html", "playground.html"} {
 		t, err := template.Must(base.Clone()).ParseFiles("templates/" + page)
 		if err != nil {
 			return nil, fmt.Errorf("parse %s: %w", page, err)
@@ -198,6 +198,27 @@ func (h *Handler) Index(w http.ResponseWriter, r *http.Request) {
 		"CanonicalURL": h.BaseURL + "/",
 	}
 	h.Templates["index.html"].ExecuteTemplate(w, "base", data)
+}
+
+// playgroundCSP は DuckDB-WASM（jsdelivr CDN + blob Worker）を許可した
+// /playground 専用の CSP。SecurityHeadersMiddleware が設定した値を上書きする。
+const playgroundCSP = "default-src 'self'; " +
+	"script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.tailwindcss.com https://unpkg.com https://cdn.jsdelivr.net; " +
+	"style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+	"img-src 'self' data:; " +
+	"font-src 'self' https://fonts.gstatic.com; " +
+	"connect-src 'self' https://cdn.jsdelivr.net https://extensions.duckdb.org; " +
+	"worker-src 'self' blob:; " +
+	"frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+
+// Playground はブラウザ内でSQLを実行するページ（DuckDB-WASM + parquet）を表示する
+func (h *Handler) Playground(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Security-Policy", playgroundCSP)
+	data := map[string]interface{}{
+		"PageTitle":    "SQL Playground | ポケモンベガ図鑑検索",
+		"CanonicalURL": h.BaseURL + "/playground",
+	}
+	h.Templates["playground.html"].ExecuteTemplate(w, "base", data)
 }
 
 // PokemonDetail はポケモン詳細ページを表示する
