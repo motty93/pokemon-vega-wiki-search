@@ -35,8 +35,6 @@ steps:
       - 'vega-pokedex-runtime@$PROJECT_ID.iam.gserviceaccount.com'
       - '--set-env-vars'
       - 'DATABASE_URL=/data/pokemon.db'
-      - '--set-secrets'
-      - 'TURSO_URL=turso-url:latest,TURSO_AUTH_TOKEN=turso-auth-token:latest'
       - '--memory'
       - '256Mi'
       - '--cpu'

@@ -6,6 +6,7 @@ COPY . .
 RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o server ./cmd/server
 
 FROM gcr.io/distroless/static-debian12:nonroot
+WORKDIR /
 COPY --from=builder --chown=nonroot:nonroot /app/server /server
 COPY --from=builder --chown=nonroot:nonroot /app/templates /templates
 COPY --from=builder --chown=nonroot:nonroot /app/static /static
