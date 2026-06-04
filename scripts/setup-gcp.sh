@@ -83,23 +83,31 @@ done
 
 echo "==> Granting Cloud Build service account permissions"
 PROJECT_NUMBER=$(gcloud projects describe "$PROJECT_ID" --format="value(projectNumber)")
-CB_SA="${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
+# Cloud Build のデフォルト実行SAは、従来の @cloudbuild から Compute デフォルトSA
+# （${PROJECT_NUMBER}-compute@developer.gserviceaccount.com）へ移行している（Google の仕様変更）。
+# どちらで実行されても通るよう、両方のSAに同じ権限を付与する。
+CB_SAS=(
+  "${PROJECT_NUMBER}@cloudbuild.gserviceaccount.com"
+  "${PROJECT_NUMBER}-compute@developer.gserviceaccount.com"
+)
 
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${CB_SA}" \
-  --role="roles/run.admin" \
-  --condition=None >/dev/null
+for cb_sa in "${CB_SAS[@]}"; do
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${cb_sa}" \
+    --role="roles/run.admin" \
+    --condition=None >/dev/null
 
-# Cloud Build が Cloud Run サービスをランタイムSAとしてデプロイするために必要
-gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
-  --member="serviceAccount:${CB_SA}" \
-  --role="roles/iam.serviceAccountUser" >/dev/null
+  # Cloud Build が Cloud Run サービスをランタイムSAとしてデプロイするために必要（actAs）
+  gcloud iam service-accounts add-iam-policy-binding "$RUNTIME_SA_EMAIL" \
+    --member="serviceAccount:${cb_sa}" \
+    --role="roles/iam.serviceAccountUser" >/dev/null
 
-# Cloud Build が自身のSAを Cloud Run の管理操作で使うためにも必要
-gcloud projects add-iam-policy-binding "$PROJECT_ID" \
-  --member="serviceAccount:${CB_SA}" \
-  --role="roles/iam.serviceAccountUser" \
-  --condition=None >/dev/null
+  # Cloud Build が自身のSAを Cloud Run の管理操作で使うためにも必要
+  gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+    --member="serviceAccount:${cb_sa}" \
+    --role="roles/iam.serviceAccountUser" \
+    --condition=None >/dev/null
+done
 
 cat <<EOF
 
