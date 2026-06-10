@@ -1,12 +1,15 @@
 {{define "content"}}
-<style>
-  [x-cloak] { display: none !important; }
-  #er-mini svg { width: 100%; height: auto; }
-  #er-mini { cursor: zoom-in; }
-  #er-full { width: 100%; height: 70vh; }
-  #er-full svg { width: 100%; height: 100%; max-width: none; }
-  .er-hint { font-size: 11px; font-weight: 400; color: #9ca3af; }
-</style>
+<script>
+  // Alpine の store 'poke' を初期化時に登録する。
+  // duckdb モジュール（後から実行）に頼らず、Alpine が DOM を評価する前に必ず定義しておく。
+  document.addEventListener('alpine:init', () => {
+    Alpine.store('poke', {
+      open: false, loading: false, error: '', data: null, evo: [],
+      close() { this.open = false; document.body.style.overflow = ''; },
+    });
+  });
+</script>
+<link rel="stylesheet" href="/static/css/playground.css">
 <div class="min-h-screen">
   <header class="text-white shadow-lg" style="background: linear-gradient(to right, #065f46, #059669, #0d9488)">
     <div class="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -138,12 +141,102 @@ LIMIT 20;">入手場所ごとの出現数</button>
           </div>
         </div>
 
+        <p id="poke-hint" class="hidden text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
+          <span class="font-bold">💡 ヒント:</span> ポケモンを含む行・セルをクリックすると要約をその場で表示します（Ctrl/⌘＋クリックで詳細ページを別タブで開く）。
+        </p>
+
         <div class="section-card !p-0 !mb-0 overflow-auto" style="max-height: 60vh">
           <div id="result" class="overflow-auto"></div>
         </div>
       </section>
     </div>
   </main>
+</div>
+
+<!-- ポケモン要約モーダル: ガワは Alpine.store('poke')、データは DuckDB/parquet（サーバー往復なし） -->
+<div x-data="{ get p() { return $store.poke.data } }"
+     x-cloak x-show="$store.poke.open" x-transition.opacity
+     @click.self="$store.poke.close()" @keydown.escape.window="$store.poke.close()"
+     class="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+     role="dialog" aria-modal="true" aria-label="ポケモン要約">
+  <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[88vh] overflow-auto">
+
+    <template x-if="$store.poke.loading">
+      <div class="p-10 text-center text-sm text-gray-400">読み込み中…</div>
+    </template>
+
+    <template x-if="$store.poke.error">
+      <div class="p-10 text-center text-sm text-red-600" x-text="'取得エラー: ' + $store.poke.error"></div>
+    </template>
+
+    <template x-if="!$store.poke.loading && !$store.poke.error && p">
+      <div>
+        <div class="relative px-5 pt-5 pb-3 flex items-center gap-4">
+          <img :src="p.image" alt="" class="w-24 h-24 object-contain shrink-0" onerror="this.style.display='none'">
+          <div class="min-w-0">
+            <p class="text-[11px] font-mono text-gray-400 tracking-widest" x-text="p.no"></p>
+            <h3 class="text-xl font-black text-gray-800 truncate" x-text="p.name"></h3>
+            <div class="flex gap-1 mt-1.5">
+              <template x-for="t in p.types" :key="t.name">
+                <span class="type-badge" :style="'background-color:' + t.color" x-text="t.name"></span>
+              </template>
+            </div>
+          </div>
+          <button type="button" @click="$store.poke.close()" aria-label="閉じる"
+                  class="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+        </div>
+
+        <div class="px-5 py-3 border-t border-gray-100 space-y-1.5">
+          <div class="flex items-center justify-between mb-0.5">
+            <p class="text-xs font-bold text-gray-500">種族値</p>
+            <p class="text-xs text-gray-500">合計 <span class="font-mono font-bold text-gray-800" x-text="p.total"></span></p>
+          </div>
+          <template x-for="s in p.stats" :key="s.label">
+            <div class="flex items-center gap-2">
+              <span class="w-12 text-xs text-gray-500 shrink-0" x-text="s.label"></span>
+              <div class="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                <div class="h-2.5 rounded-full" :style="'width:' + s.pct + '%;background:' + s.color"></div>
+              </div>
+              <span class="w-9 text-right text-xs font-mono text-gray-700 shrink-0" x-text="s.val"></span>
+            </div>
+          </template>
+        </div>
+
+        <template x-if="p.abilities.length">
+          <div class="px-5 py-3 border-t border-gray-100">
+            <p class="text-xs font-bold text-gray-500 mb-1">特性</p>
+            <p class="text-sm text-gray-800" x-text="p.abilities.join(' / ')"></p>
+          </div>
+        </template>
+
+        <template x-if="$store.poke.evo.length">
+          <div class="px-5 py-3 border-t border-gray-100">
+            <p class="text-xs font-bold text-gray-500 mb-1.5">進化</p>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <template x-for="(e, i) in $store.poke.evo" :key="i">
+                <span class="inline-flex items-center gap-1.5">
+                  <button type="button" class="evo-chip" @click="openPokeModal(e.from.id)" :title="e.from.name + ' を表示'">
+                    <img :src="e.from.image" alt="" class="poke-mini" onerror="this.style.display='none'">
+                    <span x-text="e.from.name"></span>
+                  </button>
+                  <span class="evo-arrow">→<span class="evo-cond" x-show="e.cond" x-text="e.cond"></span></span>
+                  <button type="button" class="evo-chip" @click="openPokeModal(e.to.id)" :title="e.to.name + ' を表示'">
+                    <img :src="e.to.image" alt="" class="poke-mini" onerror="this.style.display='none'">
+                    <span x-text="e.to.name"></span>
+                  </button>
+                </span>
+              </template>
+            </div>
+          </div>
+        </template>
+
+        <div class="px-5 py-3 border-t border-gray-100">
+          <a :href="'/pokemon/' + p.id" target="_blank" rel="noopener"
+             class="block w-full text-center px-4 py-2 bg-emerald-600 text-white rounded-lg font-bold text-sm hover:bg-emerald-700 transition-colors">詳細ページを開く ↗</a>
+        </div>
+      </div>
+    </template>
+  </div>
 </div>
 
 <script type="module">
@@ -215,6 +308,117 @@ LIMIT 20;">入手場所ごとの出現数</button>
   const cancelBtn = document.getElementById('cancel');
   const statusEl = document.getElementById('status');
   const resultEl = document.getElementById('result');
+  const hintEl = document.getElementById('poke-hint');
+
+  // ポケモン名の索引（id → name）。結果列がポケモンを指すかの判定とリンク化に使う。
+  let pokeIndex = null;
+  async function ensurePokeIndex() {
+    if (!conn || (pokeIndex && pokeIndex.size)) return;
+    try {
+      const t = await conn.query('SELECT id, name FROM pokemon');
+      const m = new Map();
+      for (const r of t.toArray()) m.set(Number(r.id), String(r.name));
+      pokeIndex = m;
+    } catch (_) {
+      pokeIndex = new Map(); // 索引が作れなくてもクエリ実行は妨げない
+    }
+  }
+
+  const pad3 = (n) => String(n).padStart(3, '0');
+  const POKE_FK_COLS = new Set(['pokemon_id', 'from_pokemon_id', 'to_pokemon_id']);
+
+  // ── ポケモン要約モーダル ──────────────────────────────────────────
+  // ガワ（開閉・描画）は Alpine.store('poke')、データ取得は DuckDB（parquet, サーバー往復なし）。
+  const TYPE_COLORS = {
+    'ノーマル': '#A8A878', 'ほのお': '#F08030', 'みず': '#6890F0', 'でんき': '#F8D030',
+    'くさ': '#78C850', 'こおり': '#98D8D8', 'かくとう': '#C03028', 'どく': '#A040A0',
+    'じめん': '#E0C068', 'ひこう': '#A890F0', 'エスパー': '#F85888', 'むし': '#A8B820',
+    'いわ': '#B8A038', 'ゴースト': '#705898', 'ドラゴン': '#7038F8', 'あく': '#705848',
+    'はがね': '#B8B8D0', 'フェアリー': '#EE99AC',
+  };
+  const typeColor = (t) => TYPE_COLORS[t] || '#68A090';
+  // [ラベル, parquet列名, バー色]
+  const STAT_DEFS = [
+    ['HP', 'hp', '#ef4444'], ['攻撃', 'attack', '#f97316'], ['防御', 'defense', '#eab308'],
+    ['特攻', 'sp_attack', '#3b82f6'], ['特防', 'sp_defense', '#22c55e'], ['素早さ', 'speed', '#ec4899'],
+  ];
+  const spriteUrl = (id) => '/static/images/pokemon/' + pad3(id) + '.png';
+
+  function buildPokeData(id, b) {
+    const types = [b.type1, b.type2]
+      .map((s) => s && String(s).trim())
+      .filter(Boolean)
+      .map((name) => ({ name, color: typeColor(name) }));
+    const abilities = [b.ability1, b.ability2]
+      .map((s) => s && String(s).trim())
+      .filter(Boolean);
+    const stats = STAT_DEFS.map(([label, key, color]) => {
+      const val = Number(b[key]);
+      return { label, color, val, pct: Math.min(100, Math.round((val * 100) / 255)) };
+    });
+    const total = stats.reduce((sum, s) => sum + s.val, 0);
+    return { id, no: 'No.' + pad3(id), name: String(b.name), image: spriteUrl(id), types, abilities, stats, total };
+  }
+
+  function buildEvo(rows) {
+    return rows.map((r) => {
+      const f = Number(r.f);
+      const t = Number(r.t);
+      return {
+        from: { id: f, name: pokeIndex.get(f) || ('No.' + f), image: spriteUrl(f) },
+        to: { id: t, name: pokeIndex.get(t) || ('No.' + t), image: spriteUrl(t) },
+        cond: r.cond ? String(r.cond) : '',
+      };
+    });
+  }
+
+  // 要約モーダルを開く。parquet から基本情報・種族値・進化を引いて store に流し込む。
+  async function openPokeModal(rawId) {
+    const id = Number(rawId);
+    const store = window.Alpine && window.Alpine.store('poke');
+    if (!conn || !store || !Number.isFinite(id)) return;
+    await ensurePokeIndex();
+    Object.assign(store, { open: true, loading: true, error: '', data: null, evo: [] });
+    document.body.style.overflow = 'hidden';
+    try {
+      const b = (await conn.query(
+        "SELECT p.name, p.type1, COALESCE(p.type2,'') AS type2, " +
+        "COALESCE(p.ability1,'') AS ability1, COALESCE(p.ability2,'') AS ability2, " +
+        "b.hp, b.attack, b.defense, b.sp_attack, b.sp_defense, b.speed " +
+        "FROM pokemon p JOIN base_stats b ON p.id = b.pokemon_id WHERE p.id = " + id
+      )).toArray()[0];
+      if (!b) {
+        store.error = 'No.' + id + ' のデータが見つかりません';
+        return;
+      }
+      const evoRows = (await conn.query(
+        "SELECT from_pokemon_id AS f, to_pokemon_id AS t, COALESCE(condition,'') AS cond " +
+        "FROM evolution WHERE from_pokemon_id = " + id + " OR to_pokemon_id = " + id + " " +
+        "ORDER BY from_pokemon_id, to_pokemon_id"
+      )).toArray();
+      store.data = buildPokeData(id, b);
+      store.evo = buildEvo(evoRows);
+    } catch (e) {
+      store.error = e.message;
+    } finally {
+      store.loading = false;
+    }
+  }
+  window.openPokeModal = openPokeModal; // Alpine テンプレート（進化チップ）から呼ぶ
+
+  // 結果テーブルのクリック: 通常クリックは要約モーダル、修飾キーでは詳細ページ（別タブ）。
+  resultEl.addEventListener('click', (e) => {
+    const a = e.target.closest('a.poke-link');
+    const tr = e.target.closest('tr.poke-row');
+    const id = a ? a.dataset.poke : (tr ? tr.dataset.poke : null);
+    if (!id) return;
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+      if (!a) window.open('/pokemon/' + id, '_blank', 'noopener'); // <a> はブラウザ標準の新タブに任せる
+      return;
+    }
+    e.preventDefault();
+    openPokeModal(id);
+  });
 
   const DEFAULT_SQL = `SELECT p.id, p.name, p.type1, p.type2,
        b.hp + b.attack + b.defense + b.sp_attack + b.sp_defense + b.speed AS total
@@ -236,26 +440,117 @@ LIMIT 20;`;
     ));
   }
 
+  // 結果列のうち「ポケモンを指す列」を判定する。
+  // - pokemon_id / from_pokemon_id / to_pokemon_id はスキーマ上つねにポケモンFK
+  // - id 列は name 列と突き合わせ、ポケモン名と一致する行が多いときだけポケモンとみなす
+  //   （move.id+name のような別テーブルの id を誤ってリンク化しないため）
+  function detectPokeCols(cols, rows) {
+    const pokeCols = new Set();
+    let nameCol = null;
+    let idCol = null;
+    for (const c of cols) {
+      const lc = c.toLowerCase();
+      if (POKE_FK_COLS.has(lc)) pokeCols.add(c);
+      if (lc === 'name' && nameCol === null) nameCol = c;
+      if (lc === 'id' && idCol === null) idCol = c;
+    }
+    let nameLinkCol = null;
+    if (idCol && pokeIndex && pokeIndex.size) {
+      if (nameCol) {
+        // name があるとき: 名前と突き合わせて確証を取る（move.id+name 等を誤検出しないため）。
+        let checked = 0;
+        let hit = 0;
+        for (const r of rows) {
+          const v = r[idCol];
+          if (v === null || v === undefined) continue;
+          const name = pokeIndex.get(Number(v));
+          if (name === undefined) continue;
+          checked++;
+          if (String(r[nameCol]) === name) hit++;
+          if (checked >= 30) break;
+        }
+        if (checked > 0 && hit / checked >= 0.6) {
+          pokeCols.add(idCol);
+          nameLinkCol = nameCol;
+        }
+      } else {
+        // name が無いとき: id 列の全(非null)値が 1〜386 に収まればポケモンとみなす。
+        // evolution.id / encounter.id を id 単独で引くと誤検出しうるが、利便性優先（ユーザー選択）。
+        let checked = 0;
+        let allInRange = true;
+        for (const r of rows) {
+          const v = r[idCol];
+          if (v === null || v === undefined) continue;
+          checked++;
+          if (!pokeIndex.has(Number(v))) {
+            allInRange = false;
+            break;
+          }
+          if (checked >= 200) break;
+        }
+        if (checked > 0 && allInRange) {
+          pokeCols.add(idCol);
+        }
+      }
+    }
+    return { pokeCols, nameLinkCol };
+  }
+
+  function pokeAnchor(id, inner, withSprite) {
+    const name = pokeIndex.get(id);
+    const title = name ? escapeHtml(name + ' を表示') : '';
+    let html = '<a href="/pokemon/' + id + '" data-poke="' + id + '" class="poke-link" title="' + title + '">';
+    if (withSprite) {
+      html += '<img src="/static/images/pokemon/' + pad3(id) + '.png" alt="" class="poke-mini" loading="lazy" onerror="this.style.display=\'none\'">';
+    }
+    html += '<span>' + inner + '</span></a>';
+    return html;
+  }
+
   function renderTable(table) {
     const cols = table.schema.fields.map((f) => f.name);
     const rows = table.toArray().slice(0, MAX_RENDER_ROWS); // 先頭のみ描画
     if (rows.length === 0) {
       resultEl.innerHTML = '<p class="p-4 text-sm text-gray-500">0 行</p>';
+      hintEl.classList.add('hidden');
       return;
     }
+
+    const { pokeCols, nameLinkCol } = detectPokeCols(cols, rows);
+    let linkable = false;
+
     let html = '<table class="data-table"><thead><tr>';
     for (const c of cols) html += '<th>' + escapeHtml(c) + '</th>';
     html += '</tr></thead><tbody>';
+
     for (const r of rows) {
-      html += '<tr>';
+      // 行が一意に1匹だけを指すなら行全体をクリック可能に。複数匹を指す行（進化の from/to 等）はセル単位のみ。
+      const ids = new Set();
+      for (const c of pokeCols) {
+        const v = r[c];
+        if (v !== null && v !== undefined && pokeIndex.has(Number(v))) ids.add(Number(v));
+      }
+      const rowPoke = ids.size === 1 ? [...ids][0] : null;
+      html += rowPoke ? '<tr class="poke-row" data-poke="' + rowPoke + '">' : '<tr>';
+
       for (const c of cols) {
         const v = r[c];
-        html += '<td>' + (v === null || v === undefined ? '' : escapeHtml(String(v))) + '</td>';
+        const text = v === null || v === undefined ? '' : escapeHtml(String(v));
+        if (pokeCols.has(c) && v !== null && v !== undefined && pokeIndex.has(Number(v))) {
+          html += '<td>' + pokeAnchor(Number(v), text, true) + '</td>';
+          linkable = true;
+        } else if (c === nameLinkCol && rowPoke) {
+          html += '<td>' + pokeAnchor(rowPoke, text, false) + '</td>';
+          linkable = true;
+        } else {
+          html += '<td>' + text + '</td>';
+        }
       }
       html += '</tr>';
     }
     html += '</tbody></table>';
     resultEl.innerHTML = html;
+    hintEl.classList.toggle('hidden', !linkable);
   }
 
   // DuckDB-WASM を初期化し、各 parquet を登録して既存テーブル名のビューを張る。
@@ -332,6 +627,7 @@ LIMIT 20;`;
       const table = await Promise.race([queryPromise, timeoutPromise]);
       clearTimeout(timeoutId);
       const ms = (performance.now() - t0).toFixed(1);
+      await ensurePokeIndex();
       renderTable(table);
       statusEl.textContent = table.numRows + ' 行 / ' + ms + ' ms'
         + (table.numRows > MAX_RENDER_ROWS ? '（先頭 ' + MAX_RENDER_ROWS + ' 行を表示）' : '');
